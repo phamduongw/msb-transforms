@@ -1,0 +1,164 @@
+CREATE OR REPLACE PACKAGE T IS
+
+    FUNCTION BILPRN(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_BILL_TYPE    IN VARCHAR2,
+        P_OS_PR_AMT    IN VARCHAR2
+    ) RETURN NUMBER;
+
+    FUNCTION BILINT(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_BILL_TYPE    IN VARCHAR2,
+        P_OS_PR_AMT    IN VARCHAR2
+    ) RETURN NUMBER;
+
+    FUNCTION BILLC(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_PAYMENT_TYPE IN VARCHAR2,
+        P_OS_PR_AMT IN VARCHAR2,
+        P_OR_PR_AMT IN VARCHAR2
+    ) RETURN NUMBER;
+
+END T;
+
+CREATE OR REPLACE PACKAGE BODY T IS
+
+    -- BILPRN
+    FUNCTION BILPRN(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_BILL_TYPE    IN VARCHAR2,
+        P_OS_PR_AMT    IN VARCHAR2
+    ) RETURN NUMBER IS
+        V_START        PLS_INTEGER := 2;
+        V_LEN          PLS_INTEGER := LENGTH(P_PAY_PROPERTY);
+        V_COLON_IDX    PLS_INTEGER;
+        V_HASH_IDX     PLS_INTEGER;
+        V_POS          VARCHAR2(8);
+        V_PAY_PROPERTY VARCHAR2(50);
+        V_BILL_TYPE    VARCHAR2(50);
+        V_OS_PR_AMT    NUMBER;
+        V_BILPRN       NUMBER := 0;
+    BEGIN
+        WHILE V_START <= V_LEN LOOP
+            V_COLON_IDX := INSTR(P_PAY_PROPERTY, ':', V_START) + 1;
+            V_HASH_IDX := INSTR(P_PAY_PROPERTY, '#', V_COLON_IDX);
+
+            IF V_HASH_IDX = 0 THEN
+                V_HASH_IDX := V_LEN + 1;
+            END IF;
+
+            V_POS := SUBSTR(P_PAY_PROPERTY, V_START, V_COLON_IDX - V_START);
+
+            V_PAY_PROPERTY := SUBSTR(P_PAY_PROPERTY, V_COLON_IDX, V_HASH_IDX - V_COLON_IDX);
+            V_BILL_TYPE := T24_UTILS_PKG.GET_STR_VAL_BY_POS_FUNC(P_BILL_TYPE, SUBSTR(V_POS, 1, INSTR(V_POS, 's') - 1) || ':');
+            V_OS_PR_AMT := T24_UTILS_PKG.GET_NUM_VAL_BY_POS_FUNC(P_OS_PR_AMT, V_POS);
+
+            IF V_PAY_PROPERTY = 'ACCOUNT'
+            AND V_BILL_TYPE IN ('INSTALLMENT', 'INVESTORBILL', 'PAYMENT')
+            AND V_OS_PR_AMT > 0
+            THEN
+                V_BILPRN := V_BILPRN + V_OS_PR_AMT;
+            END IF;
+
+            V_START := V_HASH_IDX;
+        END LOOP;
+
+        RETURN V_BILPRN;
+    END BILPRN;
+
+
+    -- BILINT
+    FUNCTION BILINT(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_BILL_TYPE    IN VARCHAR2,
+        P_OS_PR_AMT    IN VARCHAR2
+    ) RETURN NUMBER IS
+        V_START        PLS_INTEGER := 2;
+        V_LEN          PLS_INTEGER := LENGTH(P_PAY_PROPERTY);
+        V_COLON_IDX    PLS_INTEGER;
+        V_HASH_IDX     PLS_INTEGER;
+        V_POS          VARCHAR2(8);
+        V_PAY_PROPERTY VARCHAR2(50);
+        V_BILL_TYPE    VARCHAR2(50);
+        V_OS_PR_AMT    NUMBER;
+        V_BILINT       NUMBER := 0;
+    BEGIN
+        WHILE V_START <= V_LEN LOOP
+            V_COLON_IDX := INSTR(P_PAY_PROPERTY, ':', V_START) + 1;
+            V_HASH_IDX := INSTR(P_PAY_PROPERTY, '#', V_COLON_IDX);
+
+            IF V_HASH_IDX = 0 THEN
+                V_HASH_IDX := V_LEN + 1;
+            END IF;
+
+            V_POS := SUBSTR(P_PAY_PROPERTY, V_START, V_COLON_IDX - V_START);
+
+            V_PAY_PROPERTY := SUBSTR(P_PAY_PROPERTY, V_COLON_IDX, V_HASH_IDX - V_COLON_IDX);
+            V_BILL_TYPE := T24_UTILS_PKG.GET_STR_VAL_BY_POS_FUNC(P_BILL_TYPE, SUBSTR(V_POS, 1, INSTR(V_POS, 's') - 1) || ':');
+            V_OS_PR_AMT := T24_UTILS_PKG.GET_NUM_VAL_BY_POS_FUNC(P_OS_PR_AMT, V_POS);
+
+            IF V_PAY_PROPERTY IN ('LOANINTEREST', 'LNINTPREBUY', 'INVESTORINT', 'RISKINTEREST')
+            AND V_BILL_TYPE IN ('INSTALLMENT', 'INVESTORBILL', 'PAYMENT')
+            AND V_OS_PR_AMT > 0
+            THEN
+                V_BILINT := V_BILINT + V_OS_PR_AMT;
+            END IF;
+
+            V_START := V_HASH_IDX;
+        END LOOP;
+
+        RETURN V_BILINT;
+    END BILINT;
+
+
+    -- BILLC
+    FUNCTION BILLC(
+        P_PAY_PROPERTY IN VARCHAR2,
+        P_PAYMENT_TYPE IN VARCHAR2,
+        P_OS_PR_AMT IN VARCHAR2,
+        P_OR_PR_AMT IN VARCHAR2
+    ) RETURN NUMBER IS
+        V_START        PLS_INTEGER := 2;
+        V_LEN          PLS_INTEGER := LENGTH(P_PAY_PROPERTY);
+        V_COLON_IDX    PLS_INTEGER;
+        V_HASH_IDX     PLS_INTEGER;
+        V_POS          VARCHAR2(8);
+        V_PAY_PROPERTY VARCHAR2(50);
+        V_PAYMENT_TYPE VARCHAR2(50);
+        V_OS_PR_AMT    NUMBER;
+        V_OR_PR_AMT    NUMBER;
+        V_BILLC        NUMBER := 0;
+    BEGIN
+        WHILE V_START <= V_LEN LOOP
+            V_COLON_IDX := INSTR(P_PAY_PROPERTY, ':', V_START) + 1;
+            V_HASH_IDX := INSTR(P_PAY_PROPERTY, '#', V_COLON_IDX);
+
+            IF V_HASH_IDX = 0 THEN
+                V_HASH_IDX := V_LEN + 1;
+            END IF;
+
+            V_POS := SUBSTR(P_PAY_PROPERTY, V_START, V_COLON_IDX - V_START);
+
+            V_PAY_PROPERTY := SUBSTR(P_PAY_PROPERTY, V_COLON_IDX, V_HASH_IDX - V_COLON_IDX);
+            V_PAYMENT_TYPE := T24_UTILS_PKG.GET_STR_VAL_BY_POS_FUNC(P_PAYMENT_TYPE, SUBSTR(V_POS, 1, INSTR(V_POS, 's') - 1) || ':');
+            V_OS_PR_AMT := T24_UTILS_PKG.GET_NUM_VAL_BY_POS_FUNC(P_OS_PR_AMT, V_POS);
+            V_OR_PR_AMT := T24_UTILS_PKG.GET_NUM_VAL_BY_POS_FUNC(P_OR_PR_AMT, V_POS);
+
+            IF V_PAY_PROPERTY IN (
+                'LNPRINPEN', 'INVESTORPENINT', 'RISKPRINPEN',
+                'SYNPRINPEN', 'LNINTPEN', 'RISKINTPEN', 'SYNINTPEN'
+            )
+            AND V_PAYMENT_TYPE IN ('CURRENT', 'PENALTY')
+            AND V_OS_PR_AMT > 0
+            THEN
+                V_BILLC := V_BILLC + V_OR_PR_AMT;
+            END IF;
+
+            V_START := V_HASH_IDX;
+        END LOOP;
+
+        RETURN V_BILLC;
+    END BILLC;
+    
+
+END T;
