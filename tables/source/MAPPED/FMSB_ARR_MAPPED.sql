@@ -2,6 +2,7 @@ CREATE TABLE FMSB_ARR_MAPPED
 (
     RECID              VARCHAR2(255),
     WINDOW_ID          NUMBER(25),
+    OP_TYPE            CHAR(1),
     COMMIT_TS          TIMESTAMP(3),
     REPLICAT_TS        TIMESTAMP(3),
     MAPPED_TS          TIMESTAMP(3),
