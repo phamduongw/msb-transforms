@@ -1,4 +1,3 @@
-
 CREATE TABLE FMSB_ACC_MAPPED
 (
     RECID            VARCHAR2(255),
