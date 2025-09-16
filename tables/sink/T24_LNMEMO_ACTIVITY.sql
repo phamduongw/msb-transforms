@@ -4,7 +4,7 @@ CREATE TABLE T24_LNMEMO_ACTIVITY
     CURTYP       VARCHAR2(4),
     CBAL         NUMBER(15, 2),
     HOLD         NUMBER(15, 2),
-    DRLIMT       NUMBER(18, 2), --NUMBER(15, 2) 
+    DRLIMT       NUMBER(18, 2),
     ACCINT       NUMBER(17, 5),
     COMACC       NUMBER(15, 5),
     OTHCHG       NUMBER(13, 2),
