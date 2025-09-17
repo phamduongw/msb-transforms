@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE T24_LNTNEW_ACTIVITY_PKG IS
+CREATE OR REPLACE PACKAGE T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
 
     FUNCTION CALC_PMTAMT_VAL_FUNC(
         P_CALC_AMOUNT   IN VARCHAR2
@@ -36,7 +36,7 @@ CREATE OR REPLACE PACKAGE T24_LNTNEW_ACTIVITY_PKG IS
 
 END T24_LNTNEW_ACTIVITY_PKG;
 
-CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS 
+CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS 
 
     FUNCTION CALC_PMTAMT_VAL_FUNC(
         P_CALC_AMOUNT   IN VARCHAR2
@@ -338,7 +338,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ACC.CURRENCY AS CURTYP,
             ( 
                 SELECT TO_NUMBER(ATA.ORGAMT) 
-				FROM VW_FMSB_ATA_LNTNEW ATA
+				        FROM VW_FMSB_ATA_LNTNEW ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
             ) AS ORGAMT,
             TO_NUMBER(LMT.INTERNAL_AMOUNT) AS DRLIMT,
@@ -353,7 +353,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV
+					          FROM VW_FMSB_ASC_LNTNEW MV
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )                
             ) AS PMTAMT,
@@ -369,7 +369,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             TO_NUMBER(TO_CHAR(NVL(ARR.ORIG_CONTRACT_DATE, ACC.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
             (
                 SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-				FROM VW_FMSB_ARC_LNTNEW
+				        FROM VW_FMSB_ARC_LNTNEW
                 WHERE ARRANGEMENT = ARR.RECID
                 AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
             ) AS FRELDT,
@@ -386,7 +386,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV
+					          FROM VW_FMSB_ATA_LNTNEW MV
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS MATDT,
@@ -414,7 +414,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
+					          FROM VW_FMSB_ATA_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TERM,
@@ -424,7 +424,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
+					          FROM VW_FMSB_ATA_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TMCODE,
@@ -434,7 +434,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
+					          FROM VW_FMSB_ASC_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )
             ) AS FREQ,
@@ -444,7 +444,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
+					          FROM VW_FMSB_ASC_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )            
             ) AS IPFREQ,
@@ -507,7 +507,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ACC.CURRENCY AS CURTYP,
             ( 
                 SELECT TO_NUMBER(ATA.ORGAMT) 
-				FROM VW_FMSB_ATA_LNTNEW ATA
+				        FROM VW_FMSB_ATA_LNTNEW ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
             ) AS ORGAMT,
             TO_NUMBER(LMT.INTERNAL_AMOUNT) AS DRLIMT,
@@ -522,7 +522,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV
+					          FROM VW_FMSB_ASC_LNTNEW MV
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )                
             ) AS PMTAMT,
@@ -538,7 +538,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             TO_NUMBER(TO_CHAR(NVL(ARR.ORIG_CONTRACT_DATE, ACC.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
             (
                 SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-				FROM VW_FMSB_ARC_LNTNEW
+				        FROM VW_FMSB_ARC_LNTNEW
                 WHERE ARRANGEMENT = ARR.RECID
                 AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
             ) AS FRELDT,
@@ -555,7 +555,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV
+					          FROM VW_FMSB_ATA_LNTNEW MV
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS MATDT,
@@ -583,7 +583,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
+					          FROM VW_FMSB_ATA_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TERM,
@@ -593,7 +593,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
                     SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
+					          FROM VW_FMSB_ATA_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TMCODE,
@@ -603,7 +603,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
+					          FROM VW_FMSB_ASC_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )
             ) AS FREQ,
@@ -613,7 +613,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
                     SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
+					          FROM VW_FMSB_ASC_LNTNEW MV 
                     WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                 )            
             ) AS IPFREQ,
