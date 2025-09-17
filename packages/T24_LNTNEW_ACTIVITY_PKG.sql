@@ -641,7 +641,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
-        DELETE FROM T24_LNTNEW_ACTIVITY_AIT AIT
+        DELETE FROM T24_LNTNEW_ACTIVITY_AIT CDC
         WHERE EXISTS (
             SELECT 1 FROM FMSB_AIT_LNTNEW AIT
             WHERE AIT.RECID = CDC.RECID AND CDC.WINDOW_ID <= AIT.WINDOW_ID
@@ -666,7 +666,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             SELECT
                 ACC.CO_CODE AS BRN,
                 ARR.RECID AS ARR_RECID,
-                ARR.LINKED_APPL_ID AS ACCTNO
+                ARR.LINKED_APPL_ID AS ACCTNO,
                 0 AS LNNUM,
                 ACC.CUSTOMER AS CIFNO,
                 ACC.ACNAME AS ACNAME,
@@ -774,7 +774,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                         WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
                     )           
                 ) AS IPFREQ,
-                'A', --ODIND
+                'A' AS ODIND,
                 AIT.WINDOW_ID AS WINDOW_ID,
                 AIT.COMMIT_TS AS COMMIT_TS,
                 AIT.REPLICAT_TS AS REPLICAT_TS,
@@ -888,7 +888,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             SELECT
                 ACC.CO_CODE AS BRN,
                 ARR.RECID AS ARR_RECID,
-                ARR.LINKED_APPL_ID AS ACCTNO
+                ARR.LINKED_APPL_ID AS ACCTNO,
                 0 AS LNNUM,
                 ACC.CUSTOMER AS CIFNO,
                 ACC.ACNAME AS ACNAME,
@@ -982,7 +982,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                         WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS TMCODE,
-                'A', --ODIND
+                'A' AS ODIND,
                 ASCC.WINDOW_ID AS WINDOW_ID,
                 ASCC.COMMIT_TS AS COMMIT_TS,
                 ASCC.REPLICAT_TS AS REPLICAT_TS,
