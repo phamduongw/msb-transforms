@@ -16,11 +16,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_JOB',
-        attribute => 'instance_id',
-        value     => 1
-    );
+    -- DBMS_SCHEDULER.set_attribute(
+    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_JOB',
+    --     attribute => 'instance_id',
+    --     value     => 1
+    -- );
 END;
 
 -- ARR
@@ -41,11 +41,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ARR_JOB',
-        attribute => 'instance_id',
-        value     => 1
-    );
+    -- DBMS_SCHEDULER.set_attribute(
+    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ARR_JOB',
+    --     attribute => 'instance_id',
+    --     value     => 1
+    -- );
 END;
 
 -- BIL
@@ -66,11 +66,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_BIL_JOB',
-        attribute => 'instance_id',
-        value     => 1
-    );
+    -- DBMS_SCHEDULER.set_attribute(
+    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_BIL_JOB',
+    --     attribute => 'instance_id',
+    --     value     => 1
+    -- );
 END;
 
 -- ECB
@@ -91,11 +91,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ECB_JOB',
-        attribute => 'instance_id',
-        value     => 1
-    );
+    -- DBMS_SCHEDULER.set_attribute(
+    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ECB_JOB',
+    --     attribute => 'instance_id',
+    --     value     => 1
+    -- );
 END;
 
 -- DROP
@@ -124,7 +124,6 @@ WHERE OWNER = 'T24RAWOGG' AND JOB_NAME LIKE '%LNMEMO%';
 -- ERROR
 SELECT JOB_NAME, STATUS, ACTUAL_START_DATE, RUN_DURATION, ADDITIONAL_INFO
 FROM DBA_SCHEDULER_JOB_RUN_DETAILS
-WHERE OWNER = 'T24RAWOGG' AND JOB_NAME LIKE '%LNMEMO%'
-  AND STATUS = 'FAILED'
-  AND ACTUAL_START_DATE > TO_TIMESTAMP('2025-09-12 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3')
+WHERE OWNER = 'T24RAWOGG' AND JOB_NAME LIKE '%LNMEMO%' AND STATUS = 'FAILED'
+AND ACTUAL_START_DATE > TO_TIMESTAMP('2025-09-12 00:00:00.000', 'YYYY-MM-DD HH24:MI:SS.FF3')
 ORDER BY ACTUAL_START_DATE DESC;
