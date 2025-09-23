@@ -1,0 +1,25 @@
+CREATE TABLE T24_DDTNEW_ACTIVITY (
+    BRANCH         NUMBER(5,0),
+    ACNAME                    ,
+    ACCTNO         NUMBER(19,0),
+    ACTYPE         CHAR(1),
+    DDCTYP         VARCHAR2(4),
+    SCCODE         VARCHAR2(10),
+    CIFNO          NUMBER(19,0),
+    STATUS         NUMBER(1,0),
+    DATOP7         NUMBER(7,0),
+    DLA7           NUMBER(7,0),
+    DLA6           NUMBER(6,0),
+    HOLD           NUMBER(15,2),
+    CBAL           NUMBER(15,2),
+    ACCRUE         NUMBER(15,5),
+    RATE           NUMBER(11,9),
+    ODLIMT         NUMBER(15,2),
+    WINDOW_ID      NUMBER(25, 0),
+    COMMIT_TS      TIMESTAMP(3),
+    REPLICAT_TS    TIMESTAMP(3),
+    MAPPED_TS      TIMESTAMP(3),
+    CHANGED_TIME   TIMESTAMP(3) DEFAULT SYSTIMESTAMP,
+    CALL_CDC       VARCHAR2(3)
+)
+    TABLESPACE T24RAWOGG;

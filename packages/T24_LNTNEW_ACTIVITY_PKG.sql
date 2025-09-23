@@ -21,11 +21,6 @@ CREATE OR REPLACE PACKAGE T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         P_PAYMENT_FREQ IN VARCHAR2
     ) RETURN NUMBER;
 
-    FUNCTION CALC_PURCOD_VAL_FUNC(
-        P_ARR_ID IN VARCHAR2,
-        P_TODAY  IN VARCHAR2
-    ) RETURN VARCHAR2;
-
     PROCEDURE GEN_FROM_ACC_PROC;
 
     PROCEDURE GEN_FROM_ARR_PROC;
@@ -38,6 +33,9 @@ END T24_LNTNEW_ACTIVITY_PKG;
 
 CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS 
 
+---------------------------------------------------------------------------
+-- CALC_PMTAMT_VAL_FUNC
+---------------------------------------------------------------------------
     FUNCTION CALC_PMTAMT_VAL_FUNC(
         P_CALC_AMOUNT   IN VARCHAR2
     ) RETURN NUMBER IS
@@ -104,6 +102,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         RETURN V_TYPE;
     END CALC_TYPE_VAL_FUNC;
 
+---------------------------------------------------------------------------
+-- CALC_FREQ_VAL_FUNC
+---------------------------------------------------------------------------
     FUNCTION CALC_FREQ_VAL_FUNC(
         P_BILL_TYPE    IN VARCHAR2,
         P_PROPERTY     IN VARCHAR2,
@@ -161,16 +162,16 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     V_SPACE_3 := INSTR(V_PAYMENT_FREQ,' ',1,3);
                     V_SPACE_4 := INSTR(V_PAYMENT_FREQ,' ',1,4);
 
-                    V_GROUP_1 := SUBSTR(V_PAYMENT_FREQ, 1, V_SPACE_1-1);
-                    V_GROUP_2 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_1+1, V_SPACE_2-V_SPACE_1-1);
-                    V_GROUP_3 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_2+1, V_SPACE_3-V_SPACE_2-1);
-                    V_GROUP_4 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_3+1, V_SPACE_4-V_SPACE_3-1);
-                    V_GROUP_5 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_4+1);
+                    V_GROUP_1 := SUBSTR(V_PAYMENT_FREQ, 1, V_SPACE_1 -1);
+                    V_GROUP_2 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_1 +1, V_SPACE_2- V_SPACE_1 -1);
+                    V_GROUP_3 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_2 +1, V_SPACE_3- V_SPACE_2 -1);
+                    V_GROUP_4 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_3 +1, V_SPACE_4- V_SPACE_3 -1);
+                    V_GROUP_5 := SUBSTR(V_PAYMENT_FREQ, V_SPACE_4 +1);
 
-                    D_GROUP_1 := TO_NUMBER(SUBSTR(V_GROUP_1, 2, LENGTH(V_GROUP_1)-2));
-                    D_GROUP_2 := TO_NUMBER(SUBSTR(V_GROUP_2, 2, LENGTH(V_GROUP_2)-2));
-                    D_GROUP_3 := TO_NUMBER(SUBSTR(V_GROUP_3, 2, LENGTH(V_GROUP_3)-2));
-                    D_GROUP_4 := TO_NUMBER(SUBSTR(V_GROUP_4, 2, LENGTH(V_GROUP_4)-2));
+                    D_GROUP_1 := TO_NUMBER(SUBSTR(V_GROUP_1, 2, LENGTH(V_GROUP_1) -2));
+                    D_GROUP_2 := TO_NUMBER(SUBSTR(V_GROUP_2, 2, LENGTH(V_GROUP_2) -2));
+                    D_GROUP_3 := TO_NUMBER(SUBSTR(V_GROUP_3, 2, LENGTH(V_GROUP_3) -2));
+                    D_GROUP_4 := TO_NUMBER(SUBSTR(V_GROUP_4, 2, LENGTH(V_GROUP_4) -2));
 
 	                 V_FREQ_CURRENT:=
 	                    CASE
@@ -197,6 +198,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         RETURN V_FREQ_RESULT;
     END CALC_FREQ_VAL_FUNC;
 
+---------------------------------------------------------------------------
+-- CALC_IPFREQ_VAL_FUNC
+---------------------------------------------------------------------------   
     FUNCTION CALC_IPFREQ_VAL_FUNC(
         P_BILL_TYPE    IN VARCHAR2,
         P_PROPERTY     IN VARCHAR2,
@@ -210,20 +214,19 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         V_POS            VARCHAR2(4);
         V_BILL_TYPE      VARCHAR2(255);
         V_PROPERTY       VARCHAR2(50);
-        V_SPACE_1        NUMBER;
-        V_SPACE_2        NUMBER;
-        V_SPACE_3        NUMBER;
-        V_SPACE_4        NUMBER;
-        V_GROUP_1        VARCHAR2(20);
-        V_GROUP_2        VARCHAR2(20);
-        V_GROUP_3        VARCHAR2(20);
-        V_GROUP_4        VARCHAR2(20);
-        V_GROUP_5        VARCHAR2(20);
-        D_GROUP_1        NUMBER;
-        D_GROUP_2        NUMBER;
-        D_GROUP_3        NUMBER;
-        D_GROUP_4        NUMBER;
-        D_GROUP_5        NUMBER;
+        V_SPACE_1      NUMBER;
+        V_SPACE_2      NUMBER;
+        V_SPACE_3      NUMBER;
+        V_SPACE_4      NUMBER;
+        V_GROUP_1      VARCHAR2(20);
+        V_GROUP_2      VARCHAR2(20);
+        V_GROUP_3      VARCHAR2(20);
+        V_GROUP_4      VARCHAR2(20);
+        V_GROUP_5      VARCHAR2(20);
+        D_GROUP_1      NUMBER;
+        D_GROUP_2      NUMBER;
+        D_GROUP_3      NUMBER;
+        D_GROUP_4      NUMBER;
         V_IPFREQ_RESULT  NUMBER;
         V_IPFREQ_CURRENT NUMBER;
     BEGIN
@@ -290,26 +293,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         RETURN V_IPFREQ_RESULT;
     END CALC_IPFREQ_VAL_FUNC;
 
-    FUNCTION CALC_PURCOD_VAL_FUNC(
-        P_ARR_ID  IN VARCHAR2,
-        P_TODAY   IN VARCHAR2
-    ) RETURN VARCHAR2 IS
-        V_RESULT VARCHAR2(5);
-    BEGIN
-        SELECT MSB_LN_PURPOSE
-        INTO V_RESULT
-        FROM V_FMSB_AAC_MAPPED AAC
-        WHERE AAC.ID_COMP_1 = P_ARR_ID
-        AND AAC.ID_COMP_3 = (
-            SELECT MAX(AAC2.ID_COMP_3)
-            FROM V_FMSB_AAC_MAPPED AAC2
-            WHERE AAC2.ID_COMP_1 = P_ARR_ID
-            AND AAC2.ID_COMP_3 <= P_TODAY || '.9999'
-        );
-
-        RETURN V_RESULT;
-    END CALC_PURCOD_VAL_FUNC;
-
+---------------------------------------------------------------------------
+-- GEN_FROM_ACC_PROC
+---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_ACC_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
@@ -339,35 +325,35 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
                 WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
             )
-            WITH /*+ MATERIALIZE */ PRECOMPUTED AS (
-                SELECT
-                    ACC.CO_CODE AS BRN,
-                    ACC.RECID AS ACCTNO,
-                    ARR.RECID AS ARR_RECID,
-                    ACC.CUSTOMER AS CIFNO,
-                    ACC.ACNAME AS ACNAME,
-                    ARR.ARR_STATUS AS ARR_STATUS,
-                    ARR.PRODUCT_STATUS AS ARR_PRD_STT, 
-                    ARR.PRODUCT AS ARR_PRD,                
-                    ACC.CURRENCY AS CURTYP,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT,
-                    ARR.ORIG_CONTRACT_DATE AS ORIG_CONTRACT_DATE,
-                    ACC.OPENING_DATE AS OPENING_DATE,
-                    ACC.WINDOW_ID,
-                    ACC.COMMIT_TS,
-                    ACC.REPLICAT_TS,
-                    ACC.MAPPED_TS
+            WITH PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */
+                    ACC.CO_CODE             AS BRN,
+                    ACC.RECID               AS ACCTNO,
+                    ARR.RECID               AS ARR_RECID,
+                    ACC.CUSTOMER            AS CIFNO,
+                    ACC.ACNAME              AS ACNAME,
+                    ARR.ARR_STATUS          AS ARR_STATUS,
+                    ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
+                    ARR.PRODUCT             AS PRODUCT,                
+                    ACC.CURRENCY            AS CURTYP,
+                    LMT.INTERNAL_AMOUNT     AS DRLIMT,
+                    ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
+                    ACC.OPENING_DATE        AS OPENING_DATE,
+                    ACC.WINDOW_ID           AS WINDOW_ID,
+                    ACC.COMMIT_TS           AS COMMIT_TS,
+                    ACC.REPLICAT_TS         AS REPLICAT_TS,
+                    ACC.MAPPED_TS           AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                    JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
-                    JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = ACC.RECID
-                    LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+                JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
+                JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = ACC.RECID
+                LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
                 WHERE ARR.START_DATE >= V_TODAY
             ),
             ARC_AGGREGATED AS (
                 SELECT 
-                    ARRANGEMENT,
-                    TO_NUMBER(TO_CHAR(MIN(EFFECTIVE_DATE), 'YYYYDDD')) AS FRELDT,
-                    TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD')) AS FULLDT
+                    ARC.ARRANGEMENT,
+                    MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
+                    MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT,
                 FROM V_FMSB_ARC_LNTNEW ARC
                 WHERE EXISTS (
                     SELECT 1
@@ -402,8 +388,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1
                     FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )                
+                    WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
+                )
                 GROUP BY ASCC.ID_COMP_1
             ),
             AIT_AGGREGATED AS(
@@ -419,15 +405,15 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                                 END DESC
                     ) AS RN
                 FROM V_FMSB_AIT_LNTNEW AIT
-                -- WHERE EXISTS (
-                --     SELECT 1
-                --     FROM PRECOMPUTED PRE
-                --     WHERE PRE.ARR_RECID = AIT.ID_COMP_1
-                -- )                
-                WHERE AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1
+                )
+                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
             ),
-            AAC_AGGREGATED AS (
-                SELECT
+            AAC_AGGREGATED AS(
+                SELECT 
                     AAC.ID_COMP_1,
                     MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AAC_MAPPED AAC
@@ -435,7 +421,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     SELECT 1
                     FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AAC.ID_COMP_1
-                )                
+                )
+                AND ID_COMP_3 <= V_TODAY || '.9999'
                 GROUP BY AAC.ID_COMP_1
             )
             SELECT
@@ -468,8 +455,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 0 AS BILLCO,
                 0 AS YSOBAL,
                 TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
-                ARC.FRELDT AS FRELDT,
-                ARC.FULLDT AS FULLDT,
+                TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')) AS FRELDT,
+                TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')) AS FULLDT,
                 TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
                 AIT.RATE AS RATE,
                 '' AS LCTYPE,
@@ -488,11 +475,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             FROM PRECOMPUTED PRE
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
             LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
             LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
-            LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
+            LEFT JOIN FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AAC_AGGREGATED AAC ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
             LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1;
 
             DELETE FROM T24_LNTNEW_ACTIVITY_ACC
@@ -506,6 +493,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             RAISE;
     END GEN_FROM_ACC_PROC;
 
+---------------------------------------------------------------------------
+-- GEN_FROM_ARR_PROC
+---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_ARR_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
@@ -535,35 +525,35 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
                 WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
             )
-            WITH /*+ MATERIALIZE */ PRECOMPUTED AS (
-                SELECT
-                    ACC.CO_CODE AS BRN,
-                    ARR.LINKED_APPL_ID AS ACCTNO,
-                    ARR.RECID AS ARR_RECID,
-                    ACC.CUSTOMER AS CIFNO,
-                    ACC.ACNAME AS ACNAME,
-                    ARR.ARR_STATUS AS ARR_STATUS,
-                    ARR.PRODUCT_STATUS AS ARR_PRD_STT, 
-                    ARR.PRODUCT AS ARR_PRD,                
-                    ACC.CURRENCY AS CURTYP,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT,
-                    ARR.ORIG_CONTRACT_DATE AS ORIG_CONTRACT_DATE,
-                    ACC.OPENING_DATE AS OPENING_DATE,
-                    ARR.WINDOW_ID,
-                    ARR.COMMIT_TS,
-                    ARR.REPLICAT_TS,
-                    ARR.MAPPED_TS
+            WITH  PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */
+                    ACC.CO_CODE             AS BRN,
+                    ARR.LINKED_APPL_ID      AS ACCTNO,
+                    ARR.RECID               AS ARR_RECID,
+                    ACC.CUSTOMER            AS CIFNO,
+                    ACC.ACNAME              AS ACNAME,
+                    ARR.ARR_STATUS          AS ARR_STATUS,
+                    ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
+                    ARR.PRODUCT             AS PRODUCT,                
+                    ACC.CURRENCY            AS CURTYP,
+                    LMT.INTERNAL_AMOUNT     AS DRLIMT,
+                    ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
+                    ACC.OPENING_DATE        AS OPENING_DATE,
+                    ARR.WINDOW_ID           AS WINDOW_ID,
+                    ARR.COMMIT_TS           AS COMMIT_TS,
+                    ARR.REPLICAT_TS         AS REPLICAT_TS,
+                    ARR.MAPPED_TS           AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                    JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
-                    JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
-                    LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+                JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
+                JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
+                LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
                 WHERE ARR.START_DATE >= V_TODAY
             ),
             ARC_AGGREGATED AS (
                 SELECT 
-                    ARRANGEMENT,
-                    TO_NUMBER(TO_CHAR(MIN(EFFECTIVE_DATE), 'YYYYDDD')) AS FRELDT,
-                    TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD')) AS FULLDT
+                    ARC.ARRANGEMENT,
+                    MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
+                    MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT,
                 FROM V_FMSB_ARC_LNTNEW ARC
                 WHERE EXISTS (
                     SELECT 1
@@ -598,8 +588,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1
                     FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )                
+                    WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
+                )
                 GROUP BY ASCC.ID_COMP_1
             ),
             AIT_AGGREGATED AS(
@@ -615,15 +605,15 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                                 END DESC
                     ) AS RN
                 FROM V_FMSB_AIT_LNTNEW AIT
-                -- WHERE EXISTS (
-                --     SELECT 1
-                --     FROM PRECOMPUTED PRE
-                --     WHERE PRE.ARR_RECID = AIT.ID_COMP_1
-                -- )                
-                WHERE AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1
+                )
+                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
             ),
-            AAC_AGGREGATED AS (
-                SELECT
+            AAC_AGGREGATED AS(
+                SELECT 
                     AAC.ID_COMP_1,
                     MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AAC_MAPPED AAC
@@ -631,7 +621,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     SELECT 1
                     FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AAC.ID_COMP_1
-                )                
+                )
+                AND ID_COMP_3 <= V_TODAY || '.9999'
                 GROUP BY AAC.ID_COMP_1
             )
             SELECT
@@ -664,18 +655,18 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 0 AS BILLCO,
                 0 AS YSOBAL,
                 TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
-                ARC.FRELDT AS FRELDT,
-                ARC.FULLDT AS FULLDT,
+                TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')) AS FRELDT,
+                TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')) AS FULLDT,
                 TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
                 AIT.RATE AS RATE,
                 '' AS LCTYPE,
                 '' AS ACCMLC,
                 SUBSTR(ATA.TERM, 1, LENGTH(ATA.TERM)-1) AS TERM,
-                SUBSTR(ATA.TERM, -1) AS TMCODE
+                SUBSTR(ATA.TERM, -1) AS TMCODE,
                 CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS FREQ,
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
-                AAC.MSB_LN_PURPOSE AS PURCOD,
+                CALC_PURCOD_VAL_FUNC(PRE.ARR_RECID, V_TODAY) AS PURCOD,
                 PRE.WINDOW_ID,
                 PRE.COMMIT_TS,
                 PRE.REPLICAT_TS,
@@ -684,15 +675,16 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             FROM PRECOMPUTED PRE
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
             LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
             LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
-            LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
+            LEFT JOIN FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AAC_AGGREGATED AAC ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
             LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1;
 
             DELETE FROM T24_LNTNEW_ACTIVITY_ARR
             WHERE WINDOW_ID MEMBER OF V_WINDOW_ID_LIST;
+        END IF;
 
         COMMIT;
     EXCEPTION
@@ -701,6 +693,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             RAISE;
     END GEN_FROM_ARR_PROC;
 
+---------------------------------------------------------------------------
+-- GEN_FROM_AIT_PROC
+---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_AIT_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
@@ -730,36 +725,36 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
                 WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
             )
-            WITH /*+ MATERIALIZE */ PRECOMPUTED AS (
-                SELECT
-                    ACC.CO_CODE AS BRN,
-                    ARR.LINKED_APPL_ID AS ACCTNO,
-                    ARR.RECID AS ARR_RECID,
-                    ACC.CUSTOMER AS CIFNO,
-                    ACC.ACNAME AS ACNAME,
-                    ARR.ARR_STATUS AS ARR_STATUS,
-                    ARR.PRODUCT_STATUS AS ARR_PRD_STT, 
-                    ARR.PRODUCT AS ARR_PRD,                
-                    ACC.CURRENCY AS CURTYP,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT,
-                    ARR.ORIG_CONTRACT_DATE AS ORIG_CONTRACT_DATE,
-                    ACC.OPENING_DATE AS OPENING_DATE,
-                    AIT.WINDOW_ID,
-                    AIT.COMMIT_TS,
-                    AIT.REPLICAT_TS,
-                    AIT.MAPPED_TS
+            WITH PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */ 
+                    ACC.CO_CODE             AS BRN,
+                    ARR.LINKED_APPL_ID      AS ACCTNO,
+                    ARR.RECID               AS ARR_RECID,
+                    ACC.CUSTOMER            AS CIFNO,
+                    ACC.ACNAME              AS ACNAME,
+                    ARR.ARR_STATUS          AS ARR_STATUS,
+                    ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
+                    ARR.PRODUCT             AS PRODUCT,                
+                    ACC.CURRENCY            AS CURTYP,
+                    LMT.INTERNAL_AMOUNT     AS DRLIMT,
+                    ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
+                    ACC.OPENING_DATE        AS OPENING_DATE,
+                    AIT.WINDOW_ID           AS WINDOW_ID,
+                    AIT.COMMIT_TS           AS COMMIT_TS,
+                    AIT.REPLICAT_TS         AS REPLICAT_TS,
+                    AIT.MAPPED_TS.          AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                    JOIN V_FMSB_AIT_LNTNEW AIT ON AIT.WINDOW_ID = V.COLUMN_VALUE
-                    JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1
-                    JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
-                    LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+                JOIN V_FMSB_AIT_LNTNEW AIT ON AIT.WINDOW_ID = V.COLUMN_VALUE
+                JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1
+                JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
+                LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
                 WHERE ARR.START_DATE >= V_TODAY
             ),
             ARC_AGGREGATED AS (
                 SELECT 
-                    ARRANGEMENT,
-                    TO_NUMBER(TO_CHAR(MIN(EFFECTIVE_DATE), 'YYYYDDD')) AS FRELDT,
-                    TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD')) AS FULLDT
+                    ARC.ARRANGEMENT,
+                    MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
+                    MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT,
                 FROM V_FMSB_ARC_LNTNEW ARC
                 WHERE EXISTS (
                     SELECT 1
@@ -794,8 +789,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1
                     FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )                
+                    WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
+                )
                 GROUP BY ASCC.ID_COMP_1
             ),
             AIT_AGGREGATED AS(
@@ -811,15 +806,15 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                                 END DESC
                     ) AS RN
                 FROM V_FMSB_AIT_LNTNEW AIT
-                -- WHERE EXISTS (
-                --     SELECT 1
-                --     FROM PRECOMPUTED PRE
-                --     WHERE PRE.ARR_RECID = AIT.ID_COMP_1
-                -- )                
-                WHERE AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1
+                )
+                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
             ),
-            AAC_AGGREGATED AS (
-                SELECT
+            AAC_AGGREGATED AS(
+                SELECT 
                     AAC.ID_COMP_1,
                     MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AAC_MAPPED AAC
@@ -827,7 +822,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     SELECT 1
                     FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AAC.ID_COMP_1
-                )                
+                )
+                AND ID_COMP_3 <= V_TODAY || '.9999'
                 GROUP BY AAC.ID_COMP_1
             )
             SELECT
@@ -860,36 +856,37 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 0 AS BILLCO,
                 0 AS YSOBAL,
                 TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
-                ARC.FRELDT AS FRELDT,
-                ARC.FULLDT AS FULLDT,
+                TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')) AS FRELDT,
+                TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')) AS FULLDT,
                 TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
                 AIT.RATE AS RATE,
                 '' AS LCTYPE,
                 '' AS ACCMLC,
                 SUBSTR(ATA.TERM, 1, LENGTH(ATA.TERM)-1) AS TERM,
-                SUBSTR(ATA.TERM, -1) AS TMCODE
+                SUBSTR(ATA.TERM, -1) AS TMCODE,
                 CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS FREQ,
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
-                AAC.MSB_LN_PURPOSE AS PURCOD,
+                CALC_PURCOD_VAL_FUNC(PRE.ARR_RECID, V_TODAY) AS PURCOD,
                 PRE.WINDOW_ID,
                 PRE.COMMIT_TS,
                 PRE.REPLICAT_TS,
                 PRE.MAPPED_TS,
                 'AIT'
             FROM PRECOMPUTED PRE
+            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
             LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
             LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
-            LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
-            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1;
+            LEFT JOIN FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AAC_AGGREGATED AAC ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3;
             -- AND AIT.WINDOW_ID = PRE.WINDOW_ID;
 
             DELETE FROM T24_LNTNEW_ACTIVITY_AIT
             WHERE WINDOW_ID MEMBER OF V_WINDOW_ID_LIST;
+        END IF;
 
         COMMIT;
     EXCEPTION
@@ -898,6 +895,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             RAISE;
     END GEN_FROM_AIT_PROC;
 
+---------------------------------------------------------------------------
+-- GEN_FROM_ASC_PROC
+---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_ASC_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
@@ -929,34 +929,34 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             )
             WITH /*+ MATERIALIZE */ PRECOMPUTED AS (
                 SELECT
-                    ACC.CO_CODE AS BRN,
-                    ARR.LINKED_APPL_ID AS ACCTNO,
-                    ARR.RECID AS ARR_RECID,
-                    ACC.CUSTOMER AS CIFNO,
-                    ACC.ACNAME AS ACNAME,
-                    ARR.ARR_STATUS AS ARR_STATUS,
-                    ARR.PRODUCT_STATUS AS ARR_PRD_STT, 
-                    ARR.PRODUCT AS ARR_PRD,                
-                    ACC.CURRENCY AS CURTYP,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT,
-                    ARR.ORIG_CONTRACT_DATE AS ORIG_CONTRACT_DATE,
-                    ACC.OPENING_DATE AS OPENING_DATE,
-                    ASCC.WINDOW_ID,
-                    ASCC.COMMIT_TS,
-                    ASCC.REPLICAT_TS,
-                    ASCC.MAPPED_TS
+                    ACC.CO_CODE             AS BRN,
+                    ARR.LINKED_APPL_ID      AS ACCTNO,
+                    ARR.RECID               AS ARR_RECID,
+                    ACC.CUSTOMER            AS CIFNO,
+                    ACC.ACNAME              AS ACNAME,
+                    ARR.ARR_STATUS          AS ARR_STATUS,
+                    ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
+                    ARR.PRODUCT             AS PRODUCT,                
+                    ACC.CURRENCY            AS CURTYP,
+                    LMT.INTERNAL_AMOUNT     AS DRLIMT,
+                    ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
+                    ACC.OPENING_DATE        AS OPENING_DATE,
+                    ASCC.WINDOW_ID          AS WINDOW_ID,
+                    ASCC.COMMIT_TS          AS COMMIT_TS,
+                    ASCC.REPLICAT_TS        AS REPLICAT_TS,
+                    ASCC.MAPPED_TS          AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                    JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.WINDOW_ID = V.COLUMN_VALUE
-                    JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC.ID_COMP_1
-                    JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
-                    LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+                JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.WINDOW_ID = V.COLUMN_VALUE
+                JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC.ID_COMP_1
+                JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
+                LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
                 WHERE ARR.START_DATE >= V_TODAY
             ),
             ARC_AGGREGATED AS (
                 SELECT 
-                    ARRANGEMENT,
-                    TO_NUMBER(TO_CHAR(MIN(EFFECTIVE_DATE), 'YYYYDDD')) AS FRELDT,
-                    TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD')) AS FULLDT
+                    ARC.ARRANGEMENT,
+                    MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
+                    MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT,
                 FROM V_FMSB_ARC_LNTNEW ARC
                 WHERE EXISTS (
                     SELECT 1
@@ -991,8 +991,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1
                     FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )                
+                    WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
+                )
                 GROUP BY ASCC.ID_COMP_1
             ),
             AIT_AGGREGATED AS(
@@ -1008,15 +1008,15 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                                 END DESC
                     ) AS RN
                 FROM V_FMSB_AIT_LNTNEW AIT
-                -- WHERE EXISTS (
-                --     SELECT 1
-                --     FROM PRECOMPUTED PRE
-                --     WHERE PRE.ARR_RECID = AIT.ID_COMP_1
-                -- )                
-                WHERE AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1
+                )
+                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
             ),
-            AAC_AGGREGATED AS (
-                SELECT
+            AAC_AGGREGATED AS(
+                SELECT 
                     AAC.ID_COMP_1,
                     MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AAC_MAPPED AAC
@@ -1024,7 +1024,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     SELECT 1
                     FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AAC.ID_COMP_1
-                )                
+                )
+                AND ID_COMP_3 <= V_TODAY || '.9999'
                 GROUP BY AAC.ID_COMP_1
             )
             SELECT
@@ -1057,36 +1058,36 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 0 AS BILLCO,
                 0 AS YSOBAL,
                 TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
-                ARC.FRELDT AS FRELDT,
-                ARC.FULLDT AS FULLDT,
+                TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')) AS FRELDT,
+                TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')) AS FULLDT,
                 TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
                 AIT.RATE AS RATE,
                 '' AS LCTYPE,
                 '' AS ACCMLC,
                 SUBSTR(ATA.TERM, 1, LENGTH(ATA.TERM)-1) AS TERM,
-                SUBSTR(ATA.TERM, -1) AS TMCODE
+                SUBSTR(ATA.TERM, -1) AS TMCODE,
                 CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS FREQ,
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
-                AAC.MSB_LN_PURPOSE AS PURCOD,
+                CALC_PURCOD_VAL_FUNC(PRE.ARR_RECID, V_TODAY) AS PURCOD,
                 PRE.WINDOW_ID,
                 PRE.COMMIT_TS,
                 PRE.REPLICAT_TS,
                 PRE.MAPPED_TS,
                 'ASC'
-                FROM PRECOMPUTED PRE
-                LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
-                LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
-                LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
-                LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
-                LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
-                LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
-                LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
-                LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1;
-                -- AND AIT.WINDOW_ID = PRE.WINDOW_ID;
+            FROM PRECOMPUTED PRE
+            LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AAC_AGGREGATED AAC ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
+            LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1 ;
 
-                DELETE FROM T24_LNTNEW_ACTIVITY_ASC
-                WHERE WINDOW_ID MEMBER OF V_WINDOW_ID_LIST;
+            DELETE FROM T24_LNTNEW_ACTIVITY_ASC
+            WHERE WINDOW_ID MEMBER OF V_WINDOW_ID_LIST;
+        END IF;
 
         COMMIT;
     EXCEPTION
