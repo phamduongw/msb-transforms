@@ -98,6 +98,44 @@ BEGIN
     -- );
 END;
 
+-- AIT
+BEGIN
+    DBMS_SCHEDULER.create_job(
+        job_name   => 'T24RAW.T24_LNTNEW_ACTIVITY_GEN_FROM_AIT_JOB',
+        job_type   => 'PLSQL_BLOCK',
+        job_action => q'[
+            BEGIN
+                EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
+                LOOP
+                    T24_LNTNEW_ACTIVITY_PKG.GEN_FROM_AIT_PROC;
+                END LOOP;
+            END;
+        ]',
+        start_date => SYSTIMESTAMP,
+        enabled    => FALSE,
+        auto_drop  => FALSE
+    );
+END;
+
+-- ASC
+BEGIN
+    DBMS_SCHEDULER.create_job(
+        job_name   => 'T24RAW.T24_LNTNEW_ACTIVITY_GEN_FROM_ASC_JOB',
+        job_type   => 'PLSQL_BLOCK',
+        job_action => q'[
+            BEGIN
+                EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
+                LOOP
+                    T24_LNTNEW_ACTIVITY_PKG.GEN_FROM_ASC_PROC;
+                END LOOP;
+            END;
+        ]',
+        start_date => SYSTIMESTAMP,
+        enabled    => FALSE,
+        auto_drop  => FALSE
+    );
+END;
+
 -- DROP
 BEGIN DBMS_SCHEDULER.drop_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_ACC_JOB', TRUE); END;
 BEGIN DBMS_SCHEDULER.drop_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_ARR_JOB', TRUE); END;
@@ -115,6 +153,7 @@ BEGIN DBMS_SCHEDULER.run_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_ACC_JOB', F
 BEGIN DBMS_SCHEDULER.run_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_ARR_JOB', FALSE); END;
 BEGIN DBMS_SCHEDULER.run_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_AIT_JOB', FALSE); END;
 BEGIN DBMS_SCHEDULER.run_job('T24RAWOGG.T24_LNTNEW_ACTIVITY_GEN_FROM_ASC_JOB', FALSE); END;
+
 
 -- STATUS
 SELECT JOB_NAME, STATE, LAST_START_DATE, RUN_COUNT, FAILURE_COUNT
