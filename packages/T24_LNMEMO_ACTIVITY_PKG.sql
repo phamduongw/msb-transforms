@@ -167,7 +167,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     -- GEN_FROM_ACC_PROC
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_ACC_PROC IS
-        V_WINDOW_ID_LIST SYS.ODCINUMBERLIST;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
         SELECT CDC.WINDOW_ID
@@ -281,7 +281,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     -- GEN_FROM_ARR_PROC
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_ARR_PROC IS
-        V_WINDOW_ID_LIST SYS.ODCINUMBERLIST;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
         SELECT CDC.WINDOW_ID
@@ -395,7 +395,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     -- GEN_FROM_BIL_PROC
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_BIL_PROC IS
-        V_WINDOW_ID_LIST SYS.ODCINUMBERLIST;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
         SELECT CDC.WINDOW_ID
@@ -510,7 +510,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     -- GEN_FROM_ECB_PROC
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_ECB_PROC IS
-        V_WINDOW_ID_LIST SYS.ODCINUMBERLIST;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
         SELECT CDC.WINDOW_ID
