@@ -1,4 +1,4 @@
-CREATE OR REPLACE PACKAGE T24_LNTNEW_ACTIVITY_PKG IS
+CREATE OR REPLACE PACKAGE T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
 
     FUNCTION CALC_PMTAMT_VAL_FUNC(
         P_CALC_AMOUNT   IN VARCHAR2
@@ -36,7 +36,7 @@ CREATE OR REPLACE PACKAGE T24_LNTNEW_ACTIVITY_PKG IS
 
 END T24_LNTNEW_ACTIVITY_PKG;
 
-CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS 
+CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS 
 
     FUNCTION CALC_PMTAMT_VAL_FUNC(
         P_CALC_AMOUNT   IN VARCHAR2
@@ -285,7 +285,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
     BEGIN
         FOR rec IN (
             SELECT SUBSTR(ID_COMP_3,1,8) as ID_COMP_3_DATE, MSB_LN_PURPOSE
-            FROM FMSB_AAC_MAPPED
+            FROM V_FMSB_AAC_MAPPED
             WHERE ID_COMP_1 = P_ARR_ID
             AND SUBSTR(ID_COMP_3,1,8) <= P_TODAY
             ORDER BY SUBSTR(ID_COMP_3,1,8)
@@ -305,7 +305,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
     BEGIN
         DELETE FROM T24_LNTNEW_ACTIVITY_ACC CDC
         WHERE EXISTS (
-            SELECT 1 FROM FMSB_ACC_MAPPED ACC
+            SELECT 1 FROM V_FMSB_ACC_MAPPED ACC
             WHERE ACC.RECID = CDC.RECID AND CDC.WINDOW_ID <= ACC.WINDOW_ID
         )
         AND ROWNUM <= 5000
@@ -322,7 +322,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
             DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
             ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-            WINDOW_ID,COMMIT_TS,REPLICAT_TS,MAPPED_TS,CALL_CDC
+            WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
         )
         SELECT
             ACC.CO_CODE AS BRN,
@@ -338,7 +338,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ACC.CURRENCY AS CURTYP,
             ( 
                 SELECT TO_NUMBER(ATA.ORGAMT) 
-				FROM VW_FMSB_ATA_LNTNEW ATA
+				FROM V_FMSB_ATA_LNTNEW ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
             ) AS ORGAMT,
             TO_NUMBER(LMT.INTERNAL_AMOUNT) AS DRLIMT,
@@ -349,12 +349,12 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             0 AS COMACC,
             (
                 SELECT CALC_PMTAMT_VAL_FUNC(ASCC.CALC_AMOUNT)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+					FROM V_FMSB_ASC_LNTNEW V
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )                
             ) AS PMTAMT,
             '' AS FNLPMT,
@@ -369,25 +369,25 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             TO_NUMBER(TO_CHAR(NVL(ARR.ORIG_CONTRACT_DATE, ACC.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
             (
                 SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-				FROM VW_FMSB_ARC_LNTNEW
+				FROM V_FMSB_MIN_ARC_LNTNEW
                 WHERE ARRANGEMENT = ARR.RECID
                 AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
             ) AS FRELDT,
             (
             	SELECT TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD'))
-				FROM FMSB_ARC_LNTNEW
+				FROM V_FMSB_ARC_LNTNEW
 				WHERE ARRANGEMENT = ARR.RECID
 				AND EFFECTIVE_DATE <= TO_DATE(V_TODAY,'YYYYMMDD')
                 GROUP BY ARRANGEMENT
             ) AS FULLDT,
             (
                 SELECT TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD'))
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS MATDT,
             (
@@ -401,7 +401,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                                   THEN TO_NUMBER(AIT.ID_COMP_3) 
                                   ELSE TO_NUMBER(AIT.ID_COMP_3) - 1  
                             END) DESC) AS RN
-						FROM FMSB_AIT_LNTNEW AIT
+						FROM V_FMSB_AIT_LNTNEW AIT
 						WHERE AIT.ID_COMP_1 = ARR.RECID
 						AND TO_DATE(REGEXP_SUBSTR(AIT.ID_COMP_3, '[^.]+', 1, 1), 'YYYYMMDD') <= TO_DATE(V_TODAY,'YYYYMMDD')
 				)WHERE RN = 1          	
@@ -410,42 +410,42 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             '' AS ACCMLC,
             (
                 SELECT REGEXP_SUBSTR(ATA.TERM, '\d+',1)
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TERM,
             (
                 SELECT REGEXP_SUBSTR(ATA.TERM, '\D+',1)
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TMCODE,
             (
                 SELECT CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+					FROM V_FMSB_ASC_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )
             ) AS FREQ,
             (
                 SELECT CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+				    FROM V_FMSB_ASC_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )            
             ) AS IPFREQ,
             'A' AS ODIND,
@@ -456,9 +456,9 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ACC.MAPPED_TS,
             'ACC'
         FROM TABLE(V_WINDOW_ID_LIST) V
-	        JOIN FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
-	        JOIN FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = ACC.RECID
-	        LEFT JOIN FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+	        JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
+	        JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = ACC.RECID
+	        LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
         WHERE ARR.START_DATE >= V_TODAY;
 
         COMMIT;
@@ -474,7 +474,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
     BEGIN
         DELETE FROM T24_LNTNEW_ACTIVITY_ARR CDC
         WHERE EXISTS (
-            SELECT 1 FROM FMSB_ARR_LNTNEW ARR
+            SELECT 1 FROM V_FMSB_ARR_LNTNEW ARR
             WHERE ARR.RECID = CDC.RECID AND CDC.WINDOW_ID <= ARR.WINDOW_ID
         )
         AND ROWNUM <= 5000
@@ -491,7 +491,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
             DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
             ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-            WINDOW_ID,COMMIT_TS,REPLICAT_TS,MAPPED_TS,CALL_CDC
+            WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
         )
         SELECT
             ACC.CO_CODE AS BRN,
@@ -507,7 +507,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ACC.CURRENCY AS CURTYP,
             ( 
                 SELECT TO_NUMBER(ATA.ORGAMT) 
-				FROM VW_FMSB_ATA_LNTNEW ATA
+				FROM V_FMSB_ATA_LNTNEW ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
             ) AS ORGAMT,
             TO_NUMBER(LMT.INTERNAL_AMOUNT) AS DRLIMT,
@@ -518,12 +518,12 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             0 AS COMACC,
             (
                 SELECT CALC_PMTAMT_VAL_FUNC(ASCC.CALC_AMOUNT)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+					FROM V_FMSB_ASC_LNTNEW V
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )                
             ) AS PMTAMT,
             '' AS FNLPMT,
@@ -538,25 +538,25 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             TO_NUMBER(TO_CHAR(NVL(ARR.ORIG_CONTRACT_DATE, ACC.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
             (
                 SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-				FROM VW_FMSB_ARC_LNTNEW
+				FROM V_FMSB_MIN_ARC_LNTNEW
                 WHERE ARRANGEMENT = ARR.RECID
                 AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
             ) AS FRELDT,
             (
             	SELECT TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD'))
-				FROM FMSB_ARC_LNTNEW
+				FROM V_FMSB_ARC_LNTNEW
 				WHERE ARRANGEMENT = ARR.RECID
 				AND EFFECTIVE_DATE <= TO_DATE(V_TODAY,'YYYYMMDD')
                 GROUP BY ARRANGEMENT
             ) AS FULLDT,
             (
                 SELECT TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD'))
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS MATDT,
             (
@@ -570,7 +570,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                                   THEN TO_NUMBER(AIT.ID_COMP_3) 
                                   ELSE TO_NUMBER(AIT.ID_COMP_3) - 1  
                             END) DESC) AS RN
-						FROM FMSB_AIT_LNTNEW AIT
+						FROM V_FMSB_AIT_LNTNEW AIT
 						WHERE AIT.ID_COMP_1 = ARR.RECID
 						AND TO_DATE(REGEXP_SUBSTR(AIT.ID_COMP_3, '[^.]+', 1, 1), 'YYYYMMDD') <= TO_DATE(V_TODAY,'YYYYMMDD')
 				)WHERE RN = 1          	
@@ -579,42 +579,42 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             '' AS ACCMLC,
             (
                 SELECT REGEXP_SUBSTR(ATA.TERM, '\d+',1)
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TERM,
             (
                 SELECT REGEXP_SUBSTR(ATA.TERM, '\D+',1)
-                FROM FMSB_ATA_MAPPED ATA
+                FROM V_FMSB_ATA_MAPPED ATA
                 WHERE ATA.ID_COMP_1 = ARR.RECID
                 AND ATA.ID_COMP_3 = (
-                    SELECT MV.MIN_ID_COMP_3
-					FROM VW_FMSB_ATA_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                    SELECT V.MIN_ID_COMP_3
+					FROM V_FMSB_ATA_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                 )
             ) AS TMCODE,
             (
                 SELECT CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+					FROM V_FMSB_ASC_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )
             ) AS FREQ,
             (
                 SELECT CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                FROM FMSB_ASC_MAPPED ASCC
+                FROM V_FMSB_ASC_MAPPED ASCC
                 WHERE ASCC.ID_COMP_1 = ARR.RECID
                 AND ASCC.ID_COMP_3 = (
-                    SELECT MV.MAX_ID_COMP_3
-					FROM VW_FMSB_ASC_LNTNEW MV 
-                    WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                    SELECT V.MAX_ID_COMP_3
+					FROM V_FMSB_ASC_LNTNEW V 
+                    WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                 )            
             ) AS IPFREQ,
             'A' AS ODIND,
@@ -625,9 +625,9 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             ARR.MAPPED_TS,
             'ARR'
         FROM TABLE(V_WINDOW_ID_LIST) V
-	        JOIN FMSB_ARR_LNTNEW ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
-	        JOIN FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
-	        LEFT JOIN FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+	        JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
+	        JOIN V_FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
+	        LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
         WHERE ARR.START_DATE >= V_TODAY;
 
         COMMIT;
@@ -643,7 +643,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
     BEGIN
         DELETE FROM T24_LNTNEW_ACTIVITY_AIT CDC
         WHERE EXISTS (
-            SELECT 1 FROM FMSB_AIT_LNTNEW AIT
+            SELECT 1 FROM V_FMSB_AIT_LNTNEW AIT
             WHERE AIT.RECID = CDC.RECID AND CDC.WINDOW_ID <= AIT.WINDOW_ID
         )
         AND ROWNUM <= 5000
@@ -660,7 +660,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
             DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
             ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-            WINDOW_ID,COMMIT_TS,REPLICAT_TS,MAPPED_TS,CALL_CDC
+            WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
         )
         WITH PRECOMPUTED AS (
             SELECT
@@ -679,7 +679,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 ACC.CURRENCY AS CURTYP,
                 (
                     SELECT TO_NUMBER(ATA.ORGAMT) 
-                    FROM VW_FMSB_ATA_LNTNEW ATA
+                    FROM V_FMSB_ATA_LNTNEW ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                 ) AS ORGAMT,
                 LMT.INTERNAL_AMOUNT AS DRLIMT,
@@ -690,12 +690,12 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 0 AS COMACC,
                 (
                     SELECT CALC_PMTAMT_VAL_FUNC(ASCC.CALC_AMOUNT)
-                    FROM FMSB_ASC_MAPPED ASCC
+                    FROM V_FMSB_ASC_MAPPED ASCC
                     WHERE ASCC.ID_COMP_1 = ARR.RECID
                     AND ASCC.ID_COMP_3 = (
-                        SELECT MV.MAX_ID_COMP_3
-                        FROM VW_FMSB_ASC_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                        SELECT V.MAX_ID_COMP_3
+                        FROM V_FMSB_ASC_LNTNEW V
+                        WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                     )                
                 ) AS PMTAMT,
                 '' AS FNLPMT,
@@ -711,67 +711,67 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 ACC.OPENING_DATE AS ACC_OPENING_DATE,
                 (
                     SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-                    FROM VW_FMSB_ARC_LNTNEW
+                    FROM V_FMSB_MIN_ARC_LNTNEW
                     WHERE ARRANGEMENT = ARR.RECID
                     AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
                 ) AS FRELDT,
                 (
                     SELECT TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD'))
-                    FROM FMSB_ARC_LNTNEW
+                    FROM V_FMSB_ARC_LNTNEW
                     WHERE ARRANGEMENT = ARR.RECID
                     AND EFFECTIVE_DATE <= TO_DATE(V_TODAY,'YYYYMMDD')
                     GROUP BY ARRANGEMENT
                 ) AS FULLDT,
                 (
                     SELECT TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD'))
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS MATDT,
                 '' AS LCTYPE,
                 '' AS ACCMLC,
                 (
                     SELECT REGEXP_SUBSTR(ATA.TERM, '\d+',1)
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS TERM,
                 (
                     SELECT REGEXP_SUBSTR(ATA.TERM, '\D+',1)
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS TMCODE,
                 (
                     SELECT CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                    FROM FMSB_ASC_MAPPED ASCC
+                    FROM V_FMSB_ASC_MAPPED ASCC
                     WHERE ASCC.ID_COMP_1 = ARR.RECID
                     AND ASCC.ID_COMP_3 = (
-                        SELECT MV.MAX_ID_COMP_3
-                        FROM VW_FMSB_ASC_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                        SELECT V.MAX_ID_COMP_3
+                        FROM V_FMSB_ASC_LNTNEW V
+                        WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                     )
                 ) AS FREQ,
                 (
                     SELECT CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ)
-                    FROM FMSB_ASC_MAPPED ASCC
+                    FROM V_FMSB_ASC_MAPPED ASCC
                     WHERE ASCC.ID_COMP_1 = ARR.RECID
                     AND ASCC.ID_COMP_3 = (
-                        SELECT MV.MAX_ID_COMP_3
-                        FROM VW_FMSB_ASC_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1
+                        SELECT V.MAX_ID_COMP_3
+                        FROM V_FMSB_ASC_LNTNEW V
+                        WHERE V.ID_COMP_1 = ASCC.ID_COMP_1
                     )           
                 ) AS IPFREQ,
                 'A' AS ODIND,
@@ -780,10 +780,10 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 AIT.REPLICAT_TS AS REPLICAT_TS,
                 AIT.MAPPED_TS AS MAPPED_TS
             FROM TABLE(V_WINDOW_ID_LIST) V
-            JOIN FMSB_AIT_LNTNEW AIT ON AIT.WINDOW_ID = V.COLUMN_VALUE
-            JOIN FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1
-	        JOIN FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
-	        LEFT JOIN FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+            JOIN V_FMSB_AIT_LNTNEW AIT ON AIT.WINDOW_ID = V.COLUMN_VALUE
+            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1
+	        JOIN V_FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
+	        LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
         WHERE ARR.START_DATE >= V_TODAY
         ),
         AGGREGATED AS (
@@ -797,7 +797,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                                   THEN TO_NUMBER(AIT.ID_COMP_3) 
                                   ELSE TO_NUMBER(AIT.ID_COMP_3) - 1  
                             END) DESC) AS RN
-						FROM FMSB_AIT_LNTNEW AIT
+						FROM V_FMSB_AIT_LNTNEW AIT
 						WHERE EXISTS (
                             SELECT 1 FROM PRECOMPUTED PRE
                             WHERE PRE.ARR_RECID = AIT.ID_COMP_1
@@ -865,7 +865,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
     BEGIN
         DELETE FROM T24_LNTNEW_ACTIVITY_ASC CDC
         WHERE EXISTS (
-            SELECT 1 FROM FMSB_ASC_MAPPED ASCC
+            SELECT 1 FROM V_FMSB_ASC_MAPPED ASCC
             WHERE ASCC.RECID = CDC.RECID AND CDC.WINDOW_ID <= ASCC.WINDOW_ID
         )
         AND ROWNUM <= 5000
@@ -882,7 +882,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
             BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
             DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
             ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-            WINDOW_ID,COMMIT_TS,REPLICAT_TS,MAPPED_TS,CALL_CDC
+            WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
         )
         WITH PRECOMPUTED AS (
             SELECT
@@ -901,7 +901,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 ACC.CURRENCY AS CURTYP,
                 (
                     SELECT TO_NUMBER(ATA.ORGAMT) 
-                    FROM VW_FMSB_ATA_LNTNEW ATA
+                    FROM V_FMSB_ATA_LNTNEW ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                 ) AS ORGAMT,
                 LMT.INTERNAL_AMOUNT AS DRLIMT,
@@ -923,25 +923,25 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 ACC.OPENING_DATE AS ACC_OPENING_DATE,
                 (
                     SELECT TO_NUMBER(TO_CHAR(MIN_EFF_DAT, 'YYYYDDD'))
-                    FROM VW_FMSB_ARC_LNTNEW
+                    FROM V_FMSB_MIN_ARC_LNTNEW
                     WHERE ARRANGEMENT = ARR.RECID
                     AND MIN_EFF_DAT <= TO_DATE(V_TODAY, 'YYYYMMDD')
                 ) AS FRELDT,
                 (
                     SELECT TO_NUMBER(TO_CHAR(MAX(EFFECTIVE_DATE), 'YYYYDDD'))
-                    FROM FMSB_ARC_LNTNEW
+                    FROM V_FMSB_ARC_LNTNEW
                     WHERE ARRANGEMENT = ARR.RECID
                     AND EFFECTIVE_DATE <= TO_DATE(V_TODAY,'YYYYMMDD')
                     GROUP BY ARRANGEMENT
                 ) AS FULLDT,
                 (
                     SELECT TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD'))
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS MATDT,
                 (
@@ -955,7 +955,7 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                                     THEN TO_NUMBER(AIT.ID_COMP_3) 
                                     ELSE TO_NUMBER(AIT.ID_COMP_3) - 1  
                                 END) DESC) AS RN
-                            FROM FMSB_AIT_LNTNEW AIT
+                            FROM V_FMSB_AIT_LNTNEW AIT
                             WHERE AIT.ID_COMP_1 = ARR.RECID
                             AND TO_DATE(REGEXP_SUBSTR(AIT.ID_COMP_3, '[^.]+', 1, 1), 'YYYYMMDD') <= TO_DATE(V_TODAY,'YYYYMMDD')
                     )WHERE RN = 1          	
@@ -964,22 +964,22 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 '' AS ACCMLC,
                 (
                     SELECT REGEXP_SUBSTR(ATA.TERM, '\d+',1)
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS TERM,
                 (
                     SELECT REGEXP_SUBSTR(ATA.TERM, '\D+',1)
-                    FROM FMSB_ATA_MAPPED ATA
+                    FROM V_FMSB_ATA_MAPPED ATA
                     WHERE ATA.ID_COMP_1 = ARR.RECID
                     AND ATA.ID_COMP_3 = (
-                        SELECT MV.MIN_ID_COMP_3
-                        FROM VW_FMSB_ATA_LNTNEW MV
-                        WHERE MV.ID_COMP_1 = ATA.ID_COMP_1                    
+                        SELECT V.MIN_ID_COMP_3
+                        FROM V_FMSB_ATA_LNTNEW V
+                        WHERE V.ID_COMP_1 = ATA.ID_COMP_1                    
                     )
                 ) AS TMCODE,
                 'A' AS ODIND,
@@ -988,22 +988,22 @@ CREATE OR REPLACE PACKAGE BODY T24_LNTNEW_ACTIVITY_PKG IS
                 ASCC.REPLICAT_TS AS REPLICAT_TS,
                 ASCC.MAPPED_TS AS MAPPED_TS
             FROM TABLE(V_WINDOW_ID_LIST) V
-            JOIN FMSB_ASC_MAPPED ASCC ON ASCC.WINDOW_ID = V.COLUMN_VALUE
-            JOIN FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC.ID_COMP_1
-	        JOIN FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
-	        LEFT JOIN FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
+            JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.WINDOW_ID = V.COLUMN_VALUE
+            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC.ID_COMP_1
+	        JOIN V_FMSB_ACC_MAPPED ACC ON ARR.LINKED_APPL_ID = ACC.RECID
+	        LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
         WHERE ARR.START_DATE >= V_TODAY
         ),
         AGGREGATED AS (
             SELECT ASCC.ID_COMP_1, ASCC.CALC_AMOUNT, ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ, ASCC.WINDOW_ID
-            FROM FMSB_ASC_MAPPED ASCC
+            FROM V_FMSB_ASC_MAPPED ASCC
             WHERE EXISTS (
                 SELECT 1 FROM PRECOMPUTED PRE
                 WHERE PRE.ARR_RECID = ASCC.ID_COMP_1)
             AND ASCC.ID_COMP_3 = (
-                SELECT MV.MAX_ID_COMP_3
-                FROM VW_FMSB_ASC_LNTNEW MV 
-                WHERE MV.ID_COMP_1 = ASCC.ID_COMP_1)
+                SELECT V.MAX_ID_COMP_3
+                FROM V_FMSB_ASC_LNTNEW V 
+                WHERE V.ID_COMP_1 = ASCC.ID_COMP_1)
         )
         SELECT
             PRE.BRN,
