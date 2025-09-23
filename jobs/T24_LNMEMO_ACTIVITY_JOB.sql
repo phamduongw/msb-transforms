@@ -7,7 +7,7 @@ BEGIN
             BEGIN
                 EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
                 LOOP
-                    T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ACC_PROC;
+                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ACC_PROC;
                 END LOOP;
             END;
         ]',
@@ -16,11 +16,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    -- DBMS_SCHEDULER.set_attribute(
-    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_JOB',
-    --     attribute => 'instance_id',
-    --     value     => 1
-    -- );
+    DBMS_SCHEDULER.set_attribute(
+        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_JOB',
+        attribute => 'instance_id',
+        value     => 1
+    );
 END;
 
 -- ARR
@@ -32,7 +32,7 @@ BEGIN
             BEGIN
                 EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
                 LOOP
-                    T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ARR_PROC;
+                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ARR_PROC;
                 END LOOP;
             END;
         ]',
@@ -41,11 +41,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    -- DBMS_SCHEDULER.set_attribute(
-    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ARR_JOB',
-    --     attribute => 'instance_id',
-    --     value     => 1
-    -- );
+    DBMS_SCHEDULER.set_attribute(
+        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ARR_JOB',
+        attribute => 'instance_id',
+        value     => 1
+    );
 END;
 
 -- BIL
@@ -57,7 +57,7 @@ BEGIN
             BEGIN
                 EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
                 LOOP
-                    T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_BIL_PROC;
+                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_BIL_PROC;
                 END LOOP;
             END;
         ]',
@@ -66,11 +66,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    -- DBMS_SCHEDULER.set_attribute(
-    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_BIL_JOB',
-    --     attribute => 'instance_id',
-    --     value     => 1
-    -- );
+    DBMS_SCHEDULER.set_attribute(
+        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_BIL_JOB',
+        attribute => 'instance_id',
+        value     => 1
+    );
 END;
 
 -- ECB
@@ -82,7 +82,7 @@ BEGIN
             BEGIN
                 EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
                 LOOP
-                    T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ECB_PROC;
+                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ECB_PROC;
                 END LOOP;
             END;
         ]',
@@ -91,11 +91,11 @@ BEGIN
         auto_drop  => FALSE
     );
 
-    -- DBMS_SCHEDULER.set_attribute(
-    --     name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ECB_JOB',
-    --     attribute => 'instance_id',
-    --     value     => 1
-    -- );
+    DBMS_SCHEDULER.set_attribute(
+        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ECB_JOB',
+        attribute => 'instance_id',
+        value     => 1
+    );
 END;
 
 -- DROP
