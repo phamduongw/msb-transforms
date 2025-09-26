@@ -40,7 +40,7 @@ BEGIN
             END;
         ]',
         start_date       => SYSTIMESTAMP,
-        repeat_interval  => 'FREQ=MINUTELY;INTERVAL=5',
+        repeat_interval  => 'FREQ=DAILY;BYHOUR=5;BYMINUTE=0;BYSECOND=0',
         enabled          => FALSE,
         auto_drop        => FALSE
     );
