@@ -186,7 +186,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
             left join T24RAWOGG.fmsb_ft_mapped ft on stm.trans_reference = ft.recid
             left join T24RAWOGG.fmsb_ac_mapped ac on stm.trans_reference = ac.recid -- ac_charge_request
             left join T24RAWOGG.F_POR_TMTRAN por on stm.trans_reference = por.recid
-            left join T24RAWOGG.F_SUP_MAPPED sup on por.recid = sup.recid
+            left join T24RAWOGG.F_SUP_TMTRAN sup on por.recid = sup.recid
             left join T24RAWOGG.F_TMV_TMTRAN tmv on stm.trans_reference = tmv.PAYMENTDIRECTION
             left join T24RAWOGG.fmsb_acc_mapped acc on stm.ACCOUNT_NUMBER = acc.recid -- account 
             left join T24RAWOGG.fmsb_arr_mapped arr on acc.recid = arr.LINKED_APPL_ID
@@ -630,7 +630,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
             FROM TABLE(V_WINDOW_ID_LIST) V
             join t24raw.F_POR_TMTRAN por on on por.WINDOW_ID = V.COLUMN_VALUE
             join T24RAWOGG.fmsb_stm_tmtran stm on stm.our_reference = por.recid
-            join T24RAWOGG.F_SUP_MAPPED sup on por.recid = sup.recid
+            join T24RAWOGG.F_SUP_TMTRAN sup on por.recid = sup.recid
             join T24RAWOGG.F_TMV_TMTRAN tmv on stm.trans_reference = tmv.PAYMENTDIRECTION
             left join T24RAWOGG.fmsb_acc_mapped acc on stm.ACCOUNT_NUMBER = acc.recid -- account 
             left join T24RAWOGG.fmsb_arr_mapped arr on acc.recid = arr.LINKED_APPL_ID
