@@ -270,11 +270,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
             WHERE EXISTS (
                 SELECT 1
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE CDC.WINDOW_ID = V.COLUMN_VALUE
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
-        END IF;
 
-        COMMIT;
+            COMMIT;
+        END IF;
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -388,11 +388,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
             WHERE EXISTS (
                 SELECT 1
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE CDC.WINDOW_ID = V.COLUMN_VALUE
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
-        END IF;
 
-        COMMIT;
+            COMMIT;
+        END IF;
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -403,11 +403,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     -- GEN_FROM_BIL_PROC
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_BIL_PROC IS
-        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-        V_TODAY          VARCHAR2(8);
+        V_WINDOW_ID_LIST      T_WINDOW_ID_ARRAY;
+        V_ARRANGEMENT_ID_LIST T_ARRANGEMENT_ID_ARRAY;
+        V_TODAY               VARCHAR2(8);
+        V_MAPPED_TS           TIMESTAMP := SYSTIMESTAMP;
     BEGIN
-        SELECT CDC.WINDOW_ID
-        BULK COLLECT INTO V_WINDOW_ID_LIST
+        SELECT CDC.WINDOW_ID, CDC.ARRANGEMENT_ID
+        BULK COLLECT INTO V_WINDOW_ID_LIST, V_ARRANGEMENT_ID_LIST
         FROM T24_LNMEMO_ACTIVITY_BIL CDC
         WHERE EXISTS (
             SELECT 1
@@ -437,36 +439,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 BILLC,
                 BILOC,
                 BILMC,
-                WINDOW_ID,
-                COMMIT_TS,
-                REPLICAT_TS,
                 MAPPED_TS,
                 CALL_CDC
             )
-            WITH PRECOMPUTED AS (
-                SELECT /*+ MATERIALIZE */
-                    ARR.LINKED_APPL_ID  AS ACCTNO,
-                    ARR.RECID           AS ARR_RECID,
-                    ACC.CURRENCY        AS CURTYP,
-                    ECB.CURR_ASSET_TYPE AS CURR_ASSET_TYPE,
-                    ECB.OPEN_BALANCE    AS OPEN_BALANCE,
-                    ECB.CREDIT_MVMT     AS CREDIT_MVMT,
-                    ECB.DEBIT_MVMT      AS DEBIT_MVMT,
-                    ACC.FROM_DATE       AS FROM_DATE,
-                    ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT,
-                    BIL.WINDOW_ID       AS WINDOW_ID,
-                    BIL.COMMIT_TS       AS COMMIT_TS,
-                    BIL.REPLICAT_TS     AS REPLICAT_TS,
-                    BIL.MAPPED_TS       AS MAPPED_TS
-                FROM TABLE(V_WINDOW_ID_LIST) V
-                INNER JOIN V_FMSB_BIL_LNMEMO BIL ON BIL.WINDOW_ID = V.COLUMN_VALUE
-                INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.RECID     = BIL.ARRANGEMENT_ID
-                INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID     = ARR.LINKED_APPL_ID
-                INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID     = ACC.RECID
-                LEFT  JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID     = ACC.LIMIT_KEY
-            ),
-            AGGREGATED AS (
+            WITH AGGREGATED AS (
                 SELECT
                     BIL.ARRANGEMENT_ID,
                     SUM(BILPRN_AMT) AS BILPRN,
@@ -475,18 +451,18 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 FROM V_FMSB_BIL_LNMEMO BIL
                 WHERE EXISTS (
                     SELECT 1
-                    FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = BIL.ARRANGEMENT_ID
+                    FROM TABLE(V_ARRANGEMENT_ID_LIST) V
+                    WHERE V.COLUMN_VALUE = BIL.ARRANGEMENT_ID
                 )
                 GROUP BY BIL.ARRANGEMENT_ID
             )
             SELECT
-                TO_NUMBER(PRE.ACCTNO), -- ACCTNO
-                PRE.CURTYP, -- CURTYP
-                CALC_CBAL_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- CBAL
-                CALC_HOLD_VAL_FUNC(PRE.FROM_DATE, V_TODAY, PRE.LOCKED_AMOUNT), -- HOLD
-                NVL(TO_NUMBER(PRE.DRLIMT), 0), -- DRLIMT
-                CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
+                TO_NUMBER(ARR.LINKED_APPL_ID), -- ACCTNO
+                ACC.CURRENCY, -- CURTYP
+                CALC_CBAL_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT), -- CBAL
+                CALC_HOLD_VAL_FUNC(ACC.FROM_DATE, V_TODAY, ACC.LOCKED_AMOUNT), -- HOLD
+                NVL(TO_NUMBER(LMT.INTERNAL_AMOUNT), 0), -- DRLIMT
+                CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT), -- ACCINT
                 0, -- COMACC
                 0, -- OTHCHG
                 AGG.BILPRN, -- BILPRN
@@ -495,23 +471,23 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 AGG.BILLC, -- BILLC
                 0, -- BILOC
                 0, -- BILMC
-                PRE.WINDOW_ID, -- WINDOW_ID
-                PRE.COMMIT_TS, -- COMMIT_TS
-                PRE.REPLICAT_TS, -- REPLICAT_TS
-                PRE.MAPPED_TS, -- MAPPED_TS
+                V_MAPPED_TS, -- MAPPED_TS
                 'BIL' -- CALL_CDC
-            FROM PRECOMPUTED PRE
-            LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
+            FROM AGGREGATED AGG
+            INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.RECID = AGG.ARRANGEMENT_ID
+            INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
+            INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID = ACC.RECID
+            LEFT  JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY;
 
             DELETE FROM T24_LNMEMO_ACTIVITY_BIL CDC
             WHERE EXISTS (
                 SELECT 1
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE CDC.WINDOW_ID = V.COLUMN_VALUE
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
-        END IF;
 
-        COMMIT;
+            COMMIT;
+        END IF;
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
@@ -625,11 +601,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
             WHERE EXISTS (
                 SELECT 1
                 FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE CDC.WINDOW_ID = V.COLUMN_VALUE
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
-        END IF;
 
-        COMMIT;
+            COMMIT;
+        END IF;
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
