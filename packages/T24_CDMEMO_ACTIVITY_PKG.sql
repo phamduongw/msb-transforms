@@ -228,7 +228,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
         COMMIT;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RETURN; -- No records to process
+            RETURN;
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
@@ -295,7 +295,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
         COMMIT;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RETURN; -- No records to process
+            RETURN;
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
