@@ -4,6 +4,7 @@ BEGIN
         job_type         => 'PLSQL_BLOCK',
         job_action       => q'[
             BEGIN
+                DELETE FROM FMSB_ARR_CD     WHERE OP_TYPE = 'D';
                 DELETE FROM FMSB_ARR_LNMEMO WHERE OP_TYPE = 'D';
                 DELETE FROM FMSB_BIL_LNMEMO WHERE OP_TYPE = 'D';
                 DELETE FROM FMSB_AIT_LNTNEW WHERE OP_TYPE = 'D';
