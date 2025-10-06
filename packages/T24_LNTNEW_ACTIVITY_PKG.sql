@@ -724,7 +724,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         V_WINDOW_ID_LIST      T_WINDOW_ID_ARRAY;
         V_ID_COMP_1_LIST      T_ID_COMP_1_ARRAY;
         V_TODAY               VARCHAR2(8);
-        V_MAPPED_TS           TIMESTAMP := SYSTIMESTAMP;
     BEGIN
         SELECT CDC.WINDOW_ID, CDC.ID_COMP_1
         BULK COLLECT INTO V_WINDOW_ID_LIST, V_ID_COMP_1_LIST
@@ -750,7 +749,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
                 DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
                 ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-                MAPPED_TS, CALL_CDC
+                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
             )
             WITH ARC_AGGREGATED AS (
                 SELECT 
@@ -796,24 +795,31 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 GROUP BY ASCC.ID_COMP_1
             ),
             AIT_AGGREGATED AS(
-                SELECT
-                    AIT.ID_COMP_1,
-                    TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY AIT.ID_COMP_1
-                        ORDER BY AIT.ID_COMP_3 DESC,
-                                CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
-                                    THEN TO_NUMBER(AIT.ID_COMP_3)
-                                    ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
-                                END DESC
-                    ) AS RN
-                FROM V_FMSB_AIT_LNTNEW AIT
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM TABLE(V_ID_COMP_1_LIST) V
-                    WHERE V.COLUMN_VALUE = AIT.ID_COMP_1
+                SELECT ID_COMP_1, RATE, WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS FROM (
+                    SELECT
+                        AIT.ID_COMP_1,
+                        TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
+                        AIT.WINDOW_ID,
+                        AIT.COMMIT_TS,
+                        AIT.REPLICAT_TS,
+                        AIT.MAPPED_TS,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY AIT.ID_COMP_1
+                            ORDER BY AIT.ID_COMP_3 DESC,
+                                    CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
+                                        THEN TO_NUMBER(AIT.ID_COMP_3)
+                                        ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
+                                    END DESC
+                        ) AS RN
+                    FROM V_FMSB_AIT_LNTNEW AIT
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM TABLE(V_ID_COMP_1_LIST) V
+                        WHERE V.COLUMN_VALUE = AIT.ID_COMP_1
+                    )
+                    AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
                 )
-                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE RN = 1
             ),
             AAC_AGGREGATED AS(
                 SELECT 
@@ -876,10 +882,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
                 AAC.MSB_LN_PURPOSE AS PURCOD,
-                V_MAPPED_TS,
+                AIT.WINDOW_ID,
+                AIT.COMMIT_TS,
+                AIT.REPLICAT_TS,
+                AIT.MAPPED_TS,
                 'AIT'
             FROM AIT_AGGREGATED AIT
-            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1 AND AIT.RN = 1
+            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = AIT.ID_COMP_1
             JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
             LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = ARR.RECID
@@ -940,7 +949,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
                 DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
                 ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-                MAPPED_TS, CALL_CDC
+                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
             )
             WITH ARC_AGGREGATED AS (
                 SELECT 
@@ -974,36 +983,57 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 GROUP BY ATA.ID_COMP_1
             ),
             ASC_AGGREGATED AS(
-                SELECT 
-                    ASCC.ID_COMP_1,
-                    MAX(ASCC.ID_COMP_3) AS MAX_ID_COMP_3
-                FROM V_FMSB_ASC_MAPPED ASCC
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM TABLE(V_ID_COMP_1_LIST) V
-                    WHERE V.COLUMN_VALUE = ASCC.ID_COMP_1
+                SELECT ID_COMP_1, ID_COMP_3, BILL_TYPE, PROPERTY, PAYMENT_FREQ, CALC_AMOUNT, WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS
+                FROM (
+                    SELECT
+                        ASCC.ID_COMP_1,
+                        ASCC.ID_COMP_3,
+                        ASCC.BILL_TYPE,
+                        ASCC.PROPERTY,
+                        ASCC.PAYMENT_FREQ,
+                        ASCC.CALC_AMOUNT,
+                        ASCC.WINDOW_ID,
+                        ASCC.COMMIT_TS,
+                        ASCC.REPLICAT_TS,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ASCC.ID_COMP_1
+                            ORDER BY TO_NUMBER(ASCC.ID_COMP_3) DESC
+                        ) AS RN
+                    FROM V_FMSB_ASC_MAPPED ASCC
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM TABLE(V_ID_COMP_1_LIST) V
+                        WHERE V.COLUMN_VALUE = ASCC.ID_COMP_1
+                    )
                 )
-                GROUP BY ASCC.ID_COMP_1
+                WHERE RN = 1
             ),
             AIT_AGGREGATED AS(
-                SELECT
-                    AIT.ID_COMP_1,
-                    TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY AIT.ID_COMP_1
-                        ORDER BY AIT.ID_COMP_3 DESC,
-                                CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
-                                    THEN TO_NUMBER(AIT.ID_COMP_3)
-                                    ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
-                                END DESC
-                    ) AS RN
-                FROM V_FMSB_AIT_LNTNEW AIT
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM TABLE(V_ID_COMP_1_LIST) V
-                    WHERE V.COLUMN_VALUE = AIT.ID_COMP_1
+                SELECT ID_COMP_1, RATE, WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS FROM (
+                    SELECT
+                        AIT.ID_COMP_1,
+                        TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
+                        AIT.WINDOW_ID,
+                        AIT.COMMIT_TS,
+                        AIT.REPLICAT_TS,
+                        AIT.MAPPED_TS,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY AIT.ID_COMP_1
+                            ORDER BY AIT.ID_COMP_3 DESC,
+                                    CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
+                                        THEN TO_NUMBER(AIT.ID_COMP_3)
+                                        ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
+                                    END DESC
+                        ) AS RN
+                    FROM V_FMSB_AIT_LNTNEW AIT
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM TABLE(V_ID_COMP_1_LIST) V
+                        WHERE V.COLUMN_VALUE = AIT.ID_COMP_1
+                    )
+                    AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
                 )
-                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                WHERE RN = 1
             ),
             AAC_AGGREGATED AS(
                 SELECT 
@@ -1066,19 +1096,22 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
                 AAC.MSB_LN_PURPOSE AS PURCOD,
-                V_MAPPED_TS,
+                ASCC.WINDOW_ID,
+                ASCC.COMMIT_TS,
+                ASCC.REPLICAT_TS,
+                ASCC.MAPPED_TS,
                 'ASC'
-            FROM ASC_AGGREGATED ASCC_AGG
-            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC_AGG.ID_COMP_1
+            FROM ASC_AGGREGATED ASCC
+            JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = ASCC.ID_COMP_1
             JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
             LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
-            LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            -- LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = ARR.RECID
             LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = ARR.RECID
             LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
             LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = ARR.RECID
             LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
-            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = ARR.RECID AND AIT.RN = 1
+            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = ARR.RECID
             WHERE ARR.START_DATE >= V_TODAY;
 
             DELETE FROM T24_LNTNEW_ACTIVITY_ASC CDC
