@@ -137,7 +137,8 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
 					stm.THEIR_REFERENCE , 
 					stm.TRANSACTION_CODE , 
 					stm.VALUE_DATE  
-				    from FMSB_STM_MAPPED stm
+				    from TABLE(V_WINDOW_ID_LIST) V
+                    inner join FMSB_STM_MAPPED stm on stm.WINDOW_ID = V.COLUMN_VALUE
 				    where  stm.OP_TYPE <> 'D'
 				       AND stm.PRODUCT_CATEGORY <= 9999
 				       AND stm.CONSOL_KEY IS NOT NULL
@@ -247,8 +248,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
                 stm.REPLICAT_TS, 
                 stm.MAPPED_TS,
                 'STM'
-            FROM TABLE(V_WINDOW_ID_LIST) V
-            join stmt stm on stm.WINDOW_ID = V.COLUMN_VALUE
+            FROM stmt stm
             left join fmsb_ft_mapped ft on stm.our_reference = ft.recid
             left join fmsb_ac_mapped ac on stm.our_reference = ac.recid -- ac_charge_request
             left join F_POR_MAPPED por on stm.our_reference = por.recid AND por.STATUS_CODE IN ('999', '677', '687')
