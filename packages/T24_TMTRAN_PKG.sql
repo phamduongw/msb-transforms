@@ -80,7 +80,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
 		
 
         IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-			sys.dbms_session.SLEEP(0.2);
+			sys.dbms_session.SLEEP(0.5);
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
