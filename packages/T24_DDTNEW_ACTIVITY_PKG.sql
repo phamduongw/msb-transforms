@@ -1,10 +1,5 @@
 CREATE OR REPLACE PACKAGE T24RAWOGG.T24_DDTNEW_ACTIVITY_PKG IS
 
-    FUNCTION CALC_SCCODE_VAL_FUNC(
-        P_PRODUCT_STATUS IN VARCHAR2,
-        P_PRODUCT        IN VARCHAR2
-    ) RETURN VARCHAR2;
-
     FUNCTION CALC_CBAL_VAL_FUNC(
         P_CURR_ASSET_TYPE IN VARCHAR2,
         P_OPEN_BALANCE    IN VARCHAR2,
@@ -66,47 +61,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_DDTNEW_ACTIVITY_PKG IS
     END CALC_CBAL_VAL_FUNC;
 
 ---------------------------------------------------------------------------
--- CALC_SCCODE_VAL_FUNC
----------------------------------------------------------------------------
-    FUNCTION CALC_SCCODE_VAL_FUNC(
-        P_PRODUCT_STATUS IN VARCHAR2,
-        P_PRODUCT        IN VARCHAR2
-    ) RETURN VARCHAR2 IS
-        V_SCCODE           VARCHAR2(30);
-        V_START            PLS_INTEGER := 1;
-        V_LEN              PLS_INTEGER := LENGTH(P_PRODUCT_STATUS);
-        V_COLON_IDX        PLS_INTEGER;
-        V_HASH_IDX         PLS_INTEGER;
-        V_POS              VARCHAR2(6);
-        V_PRODUCT_STATUS   VARCHAR2(255);
-    BEGIN
-        IF P_PRODUCT_STATUS IS NULL THEN
-            RETURN 0;
-        END IF;
-
-        WHILE V_START <= V_LEN LOOP
-            V_COLON_IDX := INSTR(P_PRODUCT_STATUS, ':', V_START) + 1;
-            V_HASH_IDX  := INSTR(P_PRODUCT_STATUS, '#', V_COLON_IDX);
-
-            IF V_HASH_IDX = 0 THEN
-                V_HASH_IDX := V_LEN + 1;
-            END IF;
-
-            V_POS            := SUBSTR(P_PRODUCT_STATUS, V_START, V_COLON_IDX - V_START);
-            V_PRODUCT_STATUS := SUBSTR(P_PRODUCT_STATUS, V_COLON_IDX, V_HASH_IDX - V_COLON_IDX);
-
-            IF V_PRODUCT_STATUS = 'CURRENT'
-             THEN
-                V_SCCODE :=  T24_UTILS_PKG.GET_STR_VAL_BY_POS_FUNC(P_PRODUCT, V_POS);
-            END IF;
-
-            V_START := V_HASH_IDX;
-        END LOOP;
-
-        RETURN V_SCCODE;
-    END CALC_SCCODE_VAL_FUNC;
-
----------------------------------------------------------------------------
 -- GEN_FROM_ACC_PROC
 ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_ACC_PROC IS
@@ -144,7 +98,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_DDTNEW_ACTIVITY_PKG IS
                     ELSE 'D'
                 END AS ACTYPE,
                 ACC.CURRENCY AS DDCTYP,
-                CALC_SCCODE_VAL_FUNC(ARR.PRODUCT_STATUS, ARR.PRODUCT) AS SCCODE,
+                ARR.ACTIVE_PRODUCT AS SCCODE,
                 TO_NUMBER(ACC.CUSTOMER) AS CIFNO,
                 CASE
                     WHEN ARR.ARR_STATUS IN ('CLOSE','PENDING.CLOSURE','CANCELLED') THEN 2
@@ -223,7 +177,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_DDTNEW_ACTIVITY_PKG IS
                     ELSE 'D' 
                 END AS ACTYPE,
                 ACC.CURRENCY AS DDCTYP,
-                CALC_SCCODE_VAL_FUNC(ARR.PRODUCT_STATUS, ARR.PRODUCT) AS SCCODE,
+                ARR.ACTIVE_PRODUCT AS SCCODE,
                 TO_NUMBER(ACC.CUSTOMER) AS CIFNO,
                 CASE
                     WHEN ARR.ARR_STATUS IN ('CLOSE','PENDING.CLOSURE','CANCELLED') THEN 2
