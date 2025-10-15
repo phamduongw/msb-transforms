@@ -18,11 +18,7 @@ CREATE OR REPLACE PACKAGE T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
         P_DEBIT_MVMT      IN VARCHAR2
     ) RETURN NUMBER;
 
-    PROCEDURE GEN_FROM_ACC_PROC;
-
-    PROCEDURE GEN_FROM_ARR_PROC;
-
-    PROCEDURE GEN_FROM_ECB_PROC;
+    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC;
 
 END T24_CDMEMO_ACTIVITY_PKG;
 
@@ -158,33 +154,50 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
     END CALC_ACCINT_VAL_FUNC;
 
 ---------------------------------------------------------------------------
--- GEN_FROM_ACC_PROC
+-- GEN_FROM_ACC_ARR_ECB_PROC
 ---------------------------------------------------------------------------
-    PROCEDURE GEN_FROM_ACC_PROC IS
+    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC IS
+        V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
         V_TODAY          VARCHAR2(8);
     BEGIN
-        SELECT CDC.WINDOW_ID
-        BULK COLLECT INTO V_WINDOW_ID_LIST
-        FROM T24_CDMEMO_ACTIVITY_ACC CDC
+        SELECT CDC.JOIN_KEY, CDC.WINDOW_ID
+        BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
+        FROM T24_CDMEMO_ACTIVITY_ACC_ARR_ECB CDC
         WHERE EXISTS (
             SELECT 1
+            FROM V_FMSB_ECB_MAPPED ECB
+            WHERE ECB.RECID = CDC.JOIN_KEY
+            AND ECB.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
             FROM V_FMSB_ACC_MAPPED ACC
-            WHERE ACC.RECID = CDC.RECID
-            AND CDC.WINDOW_ID <= ACC.WINDOW_ID
+            WHERE ACC.RECID = CDC.JOIN_KEY
+            AND ACC.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_ARR_CD ARR
+            WHERE ARR.LINKED_APPL_ID = CDC.JOIN_KEY
+            AND ARR.WINDOW_ID >= CDC.WINDOW_ID
         );
-        -- ) FETCH FIRST 5000 ROWS ONLY;
-
-        IF V_WINDOW_ID_LIST.COUNT > 0 THEN
+        -- ) FETCH FIRST 9999 ROWS ONLY;
+        
+        IF V_JOIN_KEY_LIST.COUNT > 0 THEN
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
 
             INSERT INTO T24_CDMEMO_ACTIVITY (
                 ACCTNO, CURTYP, CDNUM, CBAL, HOLD, 
-                STATUS, ACCINT, WDRWH, PENAMT, 
-                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
+                STATUS, ACCINT, WDRWH, PENAMT, CAPTURED_TIME, CALL_CDC
             )
+            WITH GROUPED AS (
+                SELECT DISTINCT COLUMN_VALUE
+                FROM TABLE(V_JOIN_KEY_LIST)
+            ),
             SELECT
                 TO_NUMBER(ACC.RECID) AS ACCTNO,
                 ACC.CURRENCY AS CURTYP,
@@ -201,22 +214,19 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
                 CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT) AS ACCINT,
                 0 AS WDRWH,
                 0 AS PENAMT,
-                ACC.WINDOW_ID,
-                ACC.COMMIT_TS,
-                ACC.REPLICAT_TS,
-                ACC.MAPPED_TS,
-                'ACC'
-            FROM TABLE(V_WINDOW_ID_LIST) V
-            JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
-            JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID = ACC.RECID
-            JOIN V_FMSB_ARR_CD ARR ON ARR.LINKED_APPL_ID = ACC.RECID
-            LEFT JOIN F_PST_MAPPED PST ON PST.RECID = ACC.POSTING_RESTRICT;
+                V_CAPTURED_TIME,
+                '1'
+            FROM GROUPED GRP
+            INNER JOIN V_FMSB_ARR_CD     ARR ON ARR.LINKED_APPL_ID = GRP.COLUMN_VALUE
+            INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.COLUMN_VALUE
+            INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID          = GRP.COLUMN_VALUE
+            LEFT JOIN  F_PST_MAPPED      PST ON PST.RECID         = ACC.POSTING_RESTRICT;
 
-            DELETE FROM T24_CDMEMO_ACTIVITY_ACC CDC
+            DELETE FROM T24_CDMEMO_ACTIVITY_ACC_ARR_ECB CDC
             WHERE EXISTS (
                 SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
             );
 
             COMMIT;
@@ -225,146 +235,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
-    END GEN_FROM_ACC_PROC;
-
----------------------------------------------------------------------------
--- GEN_FROM_ECB_PROC
----------------------------------------------------------------------------
-    PROCEDURE GEN_FROM_ECB_PROC IS
-        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-        V_TODAY          VARCHAR2(8);
-    BEGIN
-        SELECT CDC.WINDOW_ID
-        BULK COLLECT INTO V_WINDOW_ID_LIST
-        FROM T24_CDMEMO_ACTIVITY_ECB CDC
-        WHERE EXISTS (
-            SELECT 1
-            FROM V_FMSB_ECB_MAPPED ECB
-            WHERE ECB.RECID = CDC.RECID
-            AND CDC.WINDOW_ID <= ECB.WINDOW_ID
-        );
-        -- ) FETCH FIRST 5000 ROWS ONLY;
-
-        IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-            SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
-            FROM F_DAT_MAPPED
-            WHERE RECID = 'VN0011000';
-
-            INSERT INTO T24_CDMEMO_ACTIVITY (
-                ACCTNO, CURTYP, CDNUM, CBAL, HOLD, 
-                STATUS, ACCINT, WDRWH, PENAMT, 
-                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
-            )
-            SELECT
-                TO_NUMBER(ECB.RECID) AS ACCTNO,
-                ACC.CURRENCY AS CURTYP,
-                TO_NUMBER(ACC.RECID) AS CDNUM,
-                CALC_CBAL_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT) AS CBAL, 
-                CALC_HOLD_VAL_FUNC(PRE.LOCKED_AMOUNT), -- HOLD
-                CASE
-                    WHEN ARR.ARR_STATUS IN ('CLOSE', 'PENDING.CLOSURE', 'CANCELLED') THEN 2
-                    WHEN PST.RESTRICTION_TYPE IN ('ALL', 'DEBIT') THEN 6
-                    WHEN ARR.ARR_STATUS IN ('MATURED', 'EXPIRED') THEN 3
-                    WHEN ARR.ARR_STATUS IN ('AUTH', 'AUTH-FWD') OR ARR.START_DATE = TO_DATE(V_TODAY,'YYYYMMDD') THEN 4
-                    ELSE 1
-                END AS STATUS,
-                CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT) AS ACCINT,
-                0 AS WDRWH,
-                0 AS PENAMT,
-                ECB.WINDOW_ID,
-                ECB.COMMIT_TS,
-                ECB.REPLICAT_TS,
-                ECB.MAPPED_TS,
-                'ECB'
-            FROM TABLE(V_WINDOW_ID_LIST) V
-            JOIN V_FMSB_ECB_MAPPED ECB ON ECB.WINDOW_ID = V.COLUMN_VALUE
-            JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ECB.RECID
-            JOIN V_FMSB_ARR_CD ARR ON ARR.LINKED_APPL_ID = ECB.RECID
-            LEFT JOIN F_PST_MAPPED PST ON PST.RECID = ACC.POSTING_RESTRICT;
-
-            DELETE FROM T24_CDMEMO_ACTIVITY_ECB CDC
-            WHERE EXISTS (
-                SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
-            );
-
-            COMMIT;
-        END IF;
-    EXCEPTION
-        WHEN OTHERS THEN
-            ROLLBACK;
-            RAISE;
-    END GEN_FROM_ECB_PROC;
-
----------------------------------------------------------------------------
--- GEN_FROM_ARR_PROC
----------------------------------------------------------------------------
-    PROCEDURE GEN_FROM_ARR_PROC IS
-       V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-       V_TODAY          VARCHAR2(8);
-    BEGIN
-        SELECT CDC.WINDOW_ID
-        BULK COLLECT INTO V_WINDOW_ID_LIST
-        FROM T24_CDMEMO_ACTIVITY_ARR CDC
-        WHERE EXISTS (
-            SELECT 1
-            FROM V_FMSB_ARR_CD ARR
-            WHERE ARR.RECID = CDC.RECID
-            AND CDC.WINDOW_ID <= ARR.WINDOW_ID
-        );
-        -- ) FETCH FIRST 5000 ROWS ONLY;
-
-        IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-            SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
-            FROM F_DAT_MAPPED
-            WHERE RECID = 'VN0011000';
-
-            INSERT INTO T24_CDMEMO_ACTIVITY (
-                ACCTNO, CURTYP, CDNUM, CBAL, HOLD, 
-                STATUS, ACCINT, WDRWH, PENAMT, 
-                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
-            )
-            SELECT
-                TO_NUMBER(ARR.LINKED_APPL_ID) AS ACCTNO,
-                ACC.CURRENCY AS CURTYP,
-                TO_NUMBER(ACC.RECID) AS CDNUM,
-                CALC_CBAL_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT) AS CBAL, 
-                CALC_HOLD_VAL_FUNC(PRE.LOCKED_AMOUNT), -- HOLD
-                CASE
-                    WHEN ARR.ARR_STATUS IN ('CLOSE', 'PENDING.CLOSURE', 'CANCELLED') THEN 2
-                    WHEN PST.RESTRICTION_TYPE IN ('ALL', 'DEBIT') THEN 6
-                    WHEN ARR.ARR_STATUS IN ('MATURED', 'EXPIRED') THEN 3
-                    WHEN ARR.ARR_STATUS IN ('AUTH', 'AUTH-FWD') OR ARR.START_DATE = TO_DATE(V_TODAY,'YYYYMMDD') THEN 4
-                    ELSE 1
-                END AS STATUS,
-                CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT) AS ACCINT,
-                0 AS WDRWH,
-                0 AS PENAMT,
-                ARR.WINDOW_ID,
-                ARR.COMMIT_TS,
-                ARR.REPLICAT_TS,
-                ARR.MAPPED_TS,
-                'ARR'
-            FROM TABLE(V_WINDOW_ID_LIST) V
-            JOIN V_FMSB_ARR_CD ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
-            JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
-            JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID = ARR.LINKED_APPL_ID
-            LEFT JOIN F_PST_MAPPED PST ON PST.RECID = ACC.POSTING_RESTRICT;
-
-            DELETE FROM T24_CDMEMO_ACTIVITY_ARR CDC
-            WHERE EXISTS (
-                SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
-            );
-
-            COMMIT;
-        END IF;
-    EXCEPTION
-        WHEN OTHERS THEN
-            ROLLBACK;
-            RAISE;
-    END GEN_FROM_ARR_PROC;
+    END GEN_FROM_ACC_ARR_ECB_PROC;
 
 END T24_CDMEMO_ACTIVITY_PKG;
