@@ -18,7 +18,9 @@ CREATE OR REPLACE PACKAGE T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
         P_DEBIT_MVMT      IN VARCHAR2
     ) RETURN NUMBER;
 
-    PROCEDURE GEN_FROM_ACC_ECB_PROC;
+    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC;
+    PROCEDURE GEN_FROM_BIL_PROC;
+    PROCEDURE GEN_FROM_LMT_PROC;
 
 END T24_LNMEMO_ACTIVITY_PKG;
 
@@ -151,130 +153,316 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     END CALC_ACCINT_VAL_FUNC;
 
     ---------------------------------------------------------------------------
-    -- GEN_FROM_ACC_ECB_PROC
+    -- GEN_FROM_ACC_ARR_ECB_PROC
     ---------------------------------------------------------------------------
-    PROCEDURE GEN_FROM_ACC_ECB_PROC IS
-        V_DUMMY     NUMBER;
-        V_MAPPED_TS TIMESTAMP;
+    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC IS
+        V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
     BEGIN
-        SELECT 1 INTO V_DUMMY
-        FROM T24_LNMEMO_ACTIVITY_ACC
-        WHERE ROWNUM = 1;
-
-        V_MAPPED_TS := SYSTIMESTAMP;
-
-        INSERT INTO TMP_INFLIGHT_RECORD (JOIN_KEY, WINDOW_ID)
-        SELECT JOIN_KEY, WINDOW_ID
-        FROM (
-            SELECT ACC.RECID AS JOIN_KEY, ACC.WINDOW_ID
-            FROM T24_LNMEMO_ACTIVITY_ACC_ECB CDC
-            JOIN FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = CDC.WINDOW_ID
-
-            UNION ALL
-
-            SELECT ECB.RECID AS JOIN_KEY, ECB.WINDOW_ID
-            FROM T24_LNMEMO_ACTIVITY_ACC_ECB CDC
-            JOIN FMSB_ECB_MAPPED ECB ON ECB.WINDOW_ID = CDC.WINDOW_ID
-        );
-
-        INSERT INTO T24_LNMEMO_ACTIVITY (
-            ACCTNO,
-            CURTYP,
-            CBAL,
-            HOLD,
-            DRLIMT,
-            ACCINT,
-            COMACC,
-            OTHCHG,
-            BILPRN,
-            BILINT,
-            BILESC,
-            BILLC,
-            BILOC,
-            BILMC,
-            WINDOW_ID,
-            COMMIT_TS,
-            REPLICAT_TS,
-            MAPPED_TS,
-            CALL_CDC
-        )
-        WITH GROUPED AS (
-            SELECT JOIN_KEY
-            FROM TMP_INFLIGHT_RECORD
-            GROUP BY JOIN_KEY
-        ),
-        PRECOMPUTED AS (
-            SELECT /*+ MATERIALIZE */
-                ACC.RECID           AS ACCTNO,
-                ARR.RECID           AS ARR_RECID,
-                ACC.CURRENCY        AS CURTYP,
-                ECB.CURR_ASSET_TYPE AS CURR_ASSET_TYPE,
-                ECB.OPEN_BALANCE    AS OPEN_BALANCE,
-                ECB.CREDIT_MVMT     AS CREDIT_MVMT,
-                ECB.DEBIT_MVMT      AS DEBIT_MVMT,
-                ACC.FROM_DATE       AS FROM_DATE,
-                ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
-                LMT.INTERNAL_AMOUNT AS DRLIMT,
-                ACC.WINDOW_ID       AS WINDOW_ID,
-                ACC.COMMIT_TS       AS COMMIT_TS,
-                ACC.REPLICAT_TS     AS REPLICAT_TS
-            FROM GROUPED GRP
-            INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.JOIN_KEY
-            INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID          = ACC.RECID
-            INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.LINKED_APPL_ID = ACC.RECID
-            LEFT  JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID          = ACC.LIMIT_KEY
-        ),
-        AGGREGATED AS (
-            SELECT
-                BIL.ARRANGEMENT_ID,
-                SUM(BILPRN_AMT) AS BILPRN,
-                SUM(BILINT_AMT) AS BILINT,
-                SUM(BILLC_AMT)  AS BILLC
-            FROM V_FMSB_BIL_LNMEMO BIL
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = BIL.ARRANGEMENT_ID
-            )
-            GROUP BY BIL.ARRANGEMENT_ID
-        )
-        SELECT 
-            TO_NUMBER(PRE.ACCTNO), -- ACCTNO
-            PRE.CURTYP, -- CURTYP
-            CALC_CBAL_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- CBAL
-            CALC_HOLD_VAL_FUNC(PRE.LOCKED_AMOUNT), -- HOLD
-            NVL(TO_NUMBER(PRE.DRLIMT), 0), -- DRLIMT
-            CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
-            0, -- COMACC
-            0, -- OTHCHG
-            AGG.BILPRN, -- BILPRN
-            AGG.BILINT, -- BILINT
-            0, -- BILESC
-            AGG.BILLC, -- BILLC
-            0, -- BILOC
-            0, -- BILMC
-            PRE.WINDOW_ID, -- WINDOW_ID
-            PRE.COMMIT_TS, -- COMMIT_TS
-            PRE.REPLICAT_TS, -- REPLICAT_TS
-            V_MAPPED_TS, -- MAPPED_TS
-            'ACC_ECB' -- CALL_CDC
-        FROM PRECOMPUTED PRE
-        LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
-
-        DELETE FROM T24_LNMEMO_ACTIVITY_ACC_ECB CDC
+        SELECT CDC.JOIN_KEY, CDC.WINDOW_ID
+        BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
+        FROM T24_LNMEMO_ACTIVITY_ACC_ARR_ECB CDC
         WHERE EXISTS (
             SELECT 1
-            FROM TMP_INFLIGHT_RECORD TMP
-            WHERE CDC.WINDOW_ID = TMP.WINDOW_ID
+            FROM V_FMSB_ECB_MAPPED ECB
+            WHERE ECB.RECID = CDC.JOIN_KEY
+            AND ECB.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_ACC_MAPPED ACC
+            WHERE ACC.RECID = CDC.JOIN_KEY
+            AND ACC.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_ARR_LNMEMO ARR
+            WHERE ARR.LINKED_APPL_ID = CDC.JOIN_KEY
+            AND ARR.WINDOW_ID >= CDC.WINDOW_ID
         );
+        -- ) FETCH FIRST 9999 ROWS ONLY;
+        
+        IF V_JOIN_KEY_LIST.COUNT > 0 THEN
+            INSERT INTO T24_LNMEMO_ACTIVITY (
+                ACCTNO,
+                CURTYP,
+                CBAL,
+                HOLD,
+                DRLIMT,
+                ACCINT,
+                COMACC,
+                OTHCHG,
+                BILPRN,
+                BILINT,
+                BILESC,
+                BILLC,
+                BILOC,
+                BILMC,
+                CAPTURED_TIME,
+                CALL_CDC
+            )
+            WITH GROUPED AS (
+                SELECT DISTINCT COLUMN_VALUE
+                FROM TABLE(V_JOIN_KEY_LIST)
+            ),
+            PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */
+                    ARR.RECID           AS ARR_RECID,
+                    ACC.RECID           AS ACCTNO,
+                    ACC.CURRENCY        AS CURTYP,
+                    ECB.CURR_ASSET_TYPE AS CURR_ASSET_TYPE,
+                    ECB.OPEN_BALANCE    AS OPEN_BALANCE,
+                    ECB.CREDIT_MVMT     AS CREDIT_MVMT,
+                    ECB.DEBIT_MVMT      AS DEBIT_MVMT,
+                    ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
+                    LMT.INTERNAL_AMOUNT AS DRLIMT
+                FROM GROUPED GRP
+                INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.LINKED_APPL_ID = GRP.COLUMN_VALUE
+                INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.COLUMN_VALUE
+                INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID          = GRP.COLUMN_VALUE
+                LEFT  JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID          = ACC.LIMIT_KEY
+            ),
+            AGGREGATED AS (
+                SELECT
+                    BIL.ARRANGEMENT_ID,
+                    SUM(BILPRN_AMT) AS BILPRN,
+                    SUM(BILINT_AMT) AS BILINT,
+                    SUM(BILLC_AMT)  AS BILLC
+                FROM V_FMSB_BIL_LNMEMO BIL
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = BIL.ARRANGEMENT_ID
+                )
+                GROUP BY BIL.ARRANGEMENT_ID
+            )
+            SELECT 
+                TO_NUMBER(PRE.ACCTNO), -- ACCTNO
+                PRE.CURTYP, -- CURTYP
+                CALC_CBAL_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- CBAL
+                CALC_HOLD_VAL_FUNC(PRE.LOCKED_AMOUNT), -- HOLD
+                NVL(TO_NUMBER(PRE.DRLIMT), 0), -- DRLIMT
+                CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
+                0, -- COMACC
+                0, -- OTHCHG
+                AGG.BILPRN, -- BILPRN
+                AGG.BILINT, -- BILINT
+                0, -- BILESC
+                AGG.BILLC, -- BILLC
+                0, -- BILOC
+                0, -- BILMC
+                V_CAPTURED_TIME, -- CAPTURED_TIME
+                '1' -- CALL_CDC
+            FROM PRECOMPUTED PRE
+            LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
 
-        COMMIT;
+            DELETE FROM T24_LNMEMO_ACTIVITY_ACC_ARR_ECB CDC
+            WHERE EXISTS (
+                SELECT 1
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+            );
+
+            COMMIT;
+        END IF;
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN;
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
-    END GEN_FROM_ACC_ECB_PROC;
+    END GEN_FROM_ACC_ARR_ECB_PROC;
+
+    ---------------------------------------------------------------------------
+    -- GEN_FROM_BIL_PROC
+    ---------------------------------------------------------------------------
+    PROCEDURE GEN_FROM_BIL_PROC IS
+        V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
+    BEGIN
+        SELECT CDC.ARRANGEMENT_ID, CDC.WINDOW_ID
+        BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
+        FROM T24_LNMEMO_ACTIVITY_BIL CDC
+        WHERE EXISTS (
+            SELECT 1
+            FROM V_FMSB_BIL_LNMEMO BIL
+            WHERE BIL.RECID = CDC.RECID
+            AND BIL.WINDOW_ID >= CDC.WINDOW_ID 
+        );
+        -- ) FETCH FIRST 9999 ROWS ONLY;
+
+        IF V_JOIN_KEY_LIST.COUNT > 0 THEN
+            INSERT INTO T24_LNMEMO_ACTIVITY (
+                ACCTNO,
+                CURTYP,
+                CBAL,
+                HOLD,
+                DRLIMT,
+                ACCINT,
+                COMACC,
+                OTHCHG,
+                BILPRN,
+                BILINT,
+                BILESC,
+                BILLC,
+                BILOC,
+                BILMC,
+                CAPTURED_TIME,
+                CALL_CDC
+            )
+            WITH AGGREGATED AS (
+                SELECT
+                    BIL.ARRANGEMENT_ID,
+                    SUM(BILPRN_AMT) AS BILPRN,
+                    SUM(BILINT_AMT) AS BILINT,
+                    SUM(BILLC_AMT)  AS BILLC
+                FROM V_FMSB_BIL_LNMEMO BIL
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM TABLE(V_JOIN_KEY_LIST) TMP
+                    WHERE TMP.COLUMN_VALUE = BIL.ARRANGEMENT_ID
+                )
+                GROUP BY BIL.ARRANGEMENT_ID
+            )
+            SELECT
+                TO_NUMBER(ARR.LINKED_APPL_ID), -- ACCTNO
+                ACC.CURRENCY, -- CURTYP
+                CALC_CBAL_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT), -- CBAL
+                CALC_HOLD_VAL_FUNC(ACC.LOCKED_AMOUNT), -- HOLD
+                NVL(TO_NUMBER(LMT.INTERNAL_AMOUNT), 0), -- DRLIMT
+                CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT), -- ACCINT
+                0, -- COMACC
+                0, -- OTHCHG
+                AGG.BILPRN, -- BILPRN
+                AGG.BILINT, -- BILINT
+                0, -- BILESC
+                AGG.BILLC, -- BILLC
+                0, -- BILOC
+                0, -- BILMC
+                V_CAPTURED_TIME, -- CAPTURED_TIME
+                '2' -- CALL_CDC
+            FROM AGGREGATED AGG
+            INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.RECID = AGG.ARRANGEMENT_ID
+            INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
+            INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID = ACC.RECID
+            LEFT  JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY;
+
+            DELETE FROM T24_LNMEMO_ACTIVITY_BIL CDC
+            WHERE EXISTS (
+                SELECT 1
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+            );
+
+            COMMIT;
+        END IF;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            RAISE;
+    END GEN_FROM_BIL_PROC;
+
+    ---------------------------------------------------------------------------
+    -- GEN_FROM_LMT_PROC
+    ---------------------------------------------------------------------------
+    PROCEDURE GEN_FROM_LMT_PROC IS
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
+    BEGIN
+        SELECT CDC.WINDOW_ID
+        BULK COLLECT INTO V_WINDOW_ID_LIST
+        FROM T24_LNMEMO_ACTIVITY_LMT CDC
+        WHERE EXISTS (
+            SELECT 1
+            FROM V_FMSB_LMT_MAPPED LMT
+            WHERE LMT.RECID = CDC.RECID
+            AND LMT.WINDOW_ID >= CDC.WINDOW_ID
+        );
+        -- ) FETCH FIRST 9999 ROWS ONLY;
+
+        IF V_WINDOW_ID_LIST.COUNT > 0 THEN
+            INSERT INTO T24_LNMEMO_ACTIVITY (
+                ACCTNO,
+                CURTYP,
+                CBAL,
+                HOLD,
+                DRLIMT,
+                ACCINT,
+                COMACC,
+                OTHCHG,
+                BILPRN,
+                BILINT,
+                BILESC,
+                BILLC,
+                BILOC,
+                BILMC,
+                CAPTURED_TIME,
+                CALL_CDC
+            )
+            WITH PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */
+                    ARR.RECID           AS ARR_RECID,
+                    ARR.LINKED_APPL_ID  AS ACCTNO,
+                    ACC.CURRENCY        AS CURTYP,
+                    ECB.CURR_ASSET_TYPE AS CURR_ASSET_TYPE,
+                    ECB.OPEN_BALANCE    AS OPEN_BALANCE,
+                    ECB.CREDIT_MVMT     AS CREDIT_MVMT,
+                    ECB.DEBIT_MVMT      AS DEBIT_MVMT,
+                    ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
+                    LMT.INTERNAL_AMOUNT AS DRLIMT
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+                INNER JOIN V_FMSB_LMT_MAPPED LMT ON LMT.WINDOW_ID      = TMP.COLUMN_VALUE
+                INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.LIMIT_KEY      = LMT.RECID
+                INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.LINKED_APPL_ID = ACC.RECID
+                INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID          = ACC.RECID
+            ),
+            AGGREGATED AS (
+                SELECT
+                    BIL.ARRANGEMENT_ID,
+                    SUM(BILPRN_AMT) AS BILPRN,
+                    SUM(BILINT_AMT) AS BILINT,
+                    SUM(BILLC_AMT)  AS BILLC
+                FROM V_FMSB_BIL_LNMEMO BIL
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = BIL.ARRANGEMENT_ID
+                )
+                GROUP BY BIL.ARRANGEMENT_ID
+            )
+            SELECT 
+                TO_NUMBER(PRE.ACCTNO), -- ACCTNO
+                PRE.CURTYP, -- CURTYP
+                CALC_CBAL_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- CBAL
+                CALC_HOLD_VAL_FUNC(PRE.LOCKED_AMOUNT), -- HOLD
+                NVL(TO_NUMBER(PRE.DRLIMT), 0), -- DRLIMT
+                CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
+                0, -- COMACC
+                0, -- OTHCHG
+                AGG.BILPRN, -- BILPRN
+                AGG.BILINT, -- BILINT
+                0, -- BILESC
+                AGG.BILLC, -- BILLC
+                0, -- BILOC
+                0, -- BILMC
+                V_CAPTURED_TIME, -- CAPTURED_TIME
+                '3' -- CALL_CDC
+            FROM PRECOMPUTED PRE
+            LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
+
+            DELETE FROM T24_LNMEMO_ACTIVITY_LMT CDC
+            WHERE EXISTS (
+                SELECT 1
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+            );
+
+            COMMIT;
+        END IF;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            RAISE;
+    END GEN_FROM_LMT_PROC;
 
 END T24_LNMEMO_ACTIVITY_PKG;
