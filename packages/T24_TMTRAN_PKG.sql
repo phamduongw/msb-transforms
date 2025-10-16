@@ -1,5 +1,5 @@
 
-CREATE OR REPLACE PACKAGE T24_TMTRAN_PKG IS
+CREATE OR REPLACE PACKAGE T24RAWOGG.T24_TMTRAN_PKG IS
 
 	FUNCTION CALC_PP_VAL_FUNC(
         P_LOC_FIELD_NAME_STR IN VARCHAR2,
@@ -14,7 +14,7 @@ END T24_TMTRAN_PKG;
 
 
 
-CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
+CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 
 
 ---------------------------------------------------------------------------
@@ -56,32 +56,68 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
         RETURN V_LOC_FIELD_VALIE_VAL;
     END CALC_PP_VAL_FUNC;
 
-   
----------------------------------------------------------------------------
--- PROCEDURE
----------------------------------------------------------------------------   
-    PROCEDURE GEN_FROM_STM_PROC IS
+
+ PROCEDURE GEN_FROM_STM_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_TODAY          VARCHAR2(8);
     BEGIN
-        
-	    
-	  
-        SELECT CDC.WINDOW_ID
-        BULK COLLECT INTO V_WINDOW_ID_LIST
-        FROM T24_TMTRAN_STM CDC
-        WHERE EXISTS (
-            SELECT 1
-            FROM FMSB_STM_MAPPED STM 
-            WHERE STM.RECID = CDC.RECID
-            AND CDC.WINDOW_ID <= STM.WINDOW_ID
-        );
--- 		) FETCH FIRST 100 ROWS ONLY;
-		
 
-        IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-			sys.dbms_session.SLEEP(0.5);
-            SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
+
+	select WINDOW_ID 
+	BULK COLLECT INTO  V_WINDOW_ID_LIST
+	from (
+	  select 
+	WINDOW_ID
+	from T24_TMTRAN_STM_TRIGGER cdc
+	where SYSTEM_ID not in ('FT','AC','PP','AA') 
+	  union all
+	  select
+	WINDOW_ID
+	from T24_TMTRAN_STM_TRIGGER cdc
+	where EXISTS (
+	    select 1
+	    from fmsb_ft_mapped ft 
+	where  cdc.JOIN_KEY = ft.RECID)
+	union all
+	select
+	WINDOW_ID
+	from T24_TMTRAN_STM_TRIGGER cdc
+	where EXISTS (
+	    select 1
+	    from fmsb_ac_mapped ac WHERE cdc.JOIN_KEY = ac.recid)
+	union all
+	select
+	WINDOW_ID
+	from T24_TMTRAN_STM_TRIGGER cdc
+	where EXISTS (
+	    select 1
+	    from fmsb_arr_mapped arr WHERE cdc.JOIN_KEY = arr.LINKED_APPL_ID)
+	UNION all
+	select
+	WINDOW_ID
+	from T24_TMTRAN_STM_TRIGGER cdc
+	where EXISTS (
+	    select 1
+	    from T24_TMTRAN_STM_TRIGGER tpor
+	    join F_POR_MAPPED por on tpor.JOIN_KEY = por.recid AND por.STATUS_CODE IN ('999', '677', '687')
+	    left join F_SUP_MAPPED sup on tpor.JOIN_KEY = sup.recid
+	    left join F_TMV_TMTRAN tmv on tpor.JOIN_KEY = tmv.ORIGINAL_FT_NUMBER   
+	where cdc.JOIN_KEY = nvl(por.recid,nvl(sup.recid,tmv.ORIGINAL_FT_NUMBER))
+	)) cdc
+	where EXISTS (
+	    select 1
+	    from FMSB_STM_MAPPED stm 
+	    where stm.WINDOW_ID = cdc.WINDOW_ID
+	)
+	; 
+        
+
+
+    IF V_WINDOW_ID_LIST.COUNT > 0 THEN
+
+
+       
+        SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
             INSERT INTO T24_TMTRAN (
@@ -137,31 +173,31 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
 					stm.THEIR_REFERENCE , 
 					stm.TRANSACTION_CODE , 
 					stm.VALUE_DATE  
-				    from TABLE(V_WINDOW_ID_LIST) V
-                    inner join FMSB_STM_MAPPED stm on stm.WINDOW_ID = V.COLUMN_VALUE
-				    where  stm.OP_TYPE <> 'D'
+				    from TABLE(V_WINDOW_ID_LIST) tmv
+                    inner join T24RAWOGG.FMSB_STM_MAPPED stm on tmv.COLUMN_VALUE = stm.WINDOW_ID
+				    where  (stm.OP_TYPE = 'I' OR stm.RECORD_STATUS = 'REVE')
 				       AND stm.PRODUCT_CATEGORY <= 9999
 				       AND stm.CONSOL_KEY IS NOT NULL
 				),
 	            acc_arr as (
 	                select 
-	                    acc.RECID  RECID,
+	                    arr.LINKED_APPL_ID  RECID,
 	                    acc.CATEGORY CATEGORY,
 	                    arr.PRODUCT_LINE PRODUCT_LINE
-	                from fmsb_arr_mapped arr 
-	                inner join fmsb_acc_mapped acc  on arr.LINKED_APPL_ID = acc.recid 
+	                from T24RAWOGG.fmsb_arr_mapped arr 
+	                left join T24RAWOGG.fmsb_acc_mapped acc  on arr.LINKED_APPL_ID = acc.recid 
 	            )
 				select
                 case
                     when stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') - 2 then 'PP'
                     when stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') - 1 then 'PT'
                     when stm.RECORD_STATUS = 'REVE'
-                    and stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') then 'PT'
+                    and stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') then 'CE'
                 end TMTXSTAT,
                 case
                     when stm.SYSTEM_ID = 'FT' then ft.MSB_TRANS_SEQ
                     when stm.SYSTEM_ID = 'AC' then ac.MSB_TRANS_SEQ
-                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED1,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,sup.LOC_FIELD_VALUE,'MSB.TRANS.SEQ'))
+                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED1,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.SEQ'))
                 end TMOFFSET,
                 -- bo xung them PO 
                 CASE
@@ -176,7 +212,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
                 nvl(stm.INPUTTER,'0') TMTELLID,
                 stm.recid TMTXSEQ,
                 CASE
-                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED1,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,sup.LOC_FIELD_VALUE,'MSB.TRANS.CODE'))
+                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED2,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.CODE'))
                     WHEN stm.SYSTEM_ID = 'FT' THEN ft.MSB_TRANS_CODE
                     WHEN stm.SYSTEM_ID = 'AC'
                     AND SUBSTR(stm.TRANS_REFERENCE, 1, 3) = 'CHG' THEN ac.MSB_TRANS_CODE
@@ -186,7 +222,7 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
         CASE
             WHEN acc.PRODUCT_LINE = 'DEPOSITS' THEN 'T'
             WHEN acc.PRODUCT_LINE = 'ACCOUNTS' THEN CASE
-                WHEN to_number(acc.CATEGORY) BETWEEN 6000 AND 6100 THEN 'S'
+                WHEN nvl(to_number(acc.CATEGORY),0) BETWEEN 6000 AND 6100 THEN 'S'
                 ELSE 'D'
             END
             WHEN acc.PRODUCT_LINE = 'LENDING' THEN 'L'
@@ -222,10 +258,10 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
                 REGEXP_SUBSTR(stm.RECID, '[^.]+', 1, 2) TMSSEQ,
                 CASE
                     WHEN stm.TRANS_REFERENCE LIKE 'CHG%' THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN 'VAT - ' || trim(regexp_replace(ac.REMARKS,'(^#[0-9]+:|[0-9]+:|#$)',' '))
-                        ELSE trim(regexp_replace(ac.REMARKS,'(^#[0-9]+:|[0-9]+:|#$)',' '))
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN 'VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
+                        ELSE REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
                     END
-                    WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN 'Chuyen tien tu dong – ' || stm.THEIR_REFERENCE
+                    WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN 'Chuyen tien tu dong - ' || stm.THEIR_REFERENCE
                     WHEN stm.SYSTEM_ID IN ('LCM', 'LCC', 'LCD', 'MD') THEN CASE
                         WHEN stm.TRANSACTION_CODE = '5021' THEN tr.NARRATIVE_1 || ' ' || stm.OUR_REFERENCE
                         ELSE tr.NARRATIVE_2 || ' ' || stm.OUR_REFERENCE
@@ -235,8 +271,8 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
                         ELSE 'MBNT MUA: ' || fx.AMOUNT_BOUGHT || fx.CURRENCY_BOUGHT || ', BAN: ' || fx.AMOUNT_SOLD || fx.CURRENCY_SOLD
                     END
                     WHEN stm.SYSTEM_ID = 'FT' THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '422' THEN stm.NARRATIVE_1 || '# Thu phi - ' || trim(regexp_replace(ft.PAYMENT_DETAILS,'(^#[0-9]+:|[0-9]+:|#$)',' '))
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN stm.NARRATIVE_1 || '# VAT - ' || trim(regexp_replace(ft.PAYMENT_DETAILS,'(^#[0-9]+:|[0-9]+:|#$)',' '))
+                        WHEN stm.TRANSACTION_CODE = '422' THEN stm.NARRATIVE_1 || '# Thu phi - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN stm.NARRATIVE_1 || '# VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
                         ELSE stm.NARRATIVE
                     END
                     ELSE stm.NARRATIVE
@@ -248,33 +284,30 @@ CREATE OR REPLACE PACKAGE BODY T24_TMTRAN_PKG IS
                 stm.REPLICAT_TS, 
                 stm.MAPPED_TS,
                 'STM'
-            FROM stmt stm
-            left join fmsb_ft_mapped ft on stm.our_reference = ft.recid
-            left join fmsb_ac_mapped ac on stm.our_reference = ac.recid -- ac_charge_request
-            left join F_POR_MAPPED por on stm.our_reference = por.recid AND por.STATUS_CODE IN ('999', '677', '687')
-            left join F_SUP_MAPPED sup on por.recid = sup.recid
-            left join F_TMV_TMTRAN tmv on stm.our_reference = tmv.ORIGINAL_FT_NUMBER
+            FROM stmt stm 
+            left join T24RAWOGG.fmsb_ft_mapped ft on stm.our_reference = ft.recid
+            left join T24RAWOGG.fmsb_ac_mapped ac on stm.our_reference = ac.recid -- ac_charge_request
+            left join T24RAWOGG.F_POR_MAPPED por on stm.our_reference = por.recid AND por.STATUS_CODE IN ('999', '677', '687')
+            left join T24RAWOGG.F_SUP_MAPPED sup on por.recid = sup.recid
+            left join T24RAWOGG.F_TMV_TMTRAN tmv on stm.our_reference = tmv.ORIGINAL_FT_NUMBER
             left join acc_arr acc on stm.ACCOUNT_NUMBER = acc.recid
-            left join fmsb_fx_mapped fx on stm.our_reference = fx.recid
-            left join fmsb_tr_mapped tr on stm.transaction_code = tr.recid;
+            left join T24RAWOGG.fmsb_fx_mapped fx on stm.our_reference = fx.recid
+            left join T24RAWOGG.fmsb_tr_mapped tr on stm.transaction_code = tr.recid;
 
-
-       
-        DELETE FROM T24_TMTRAN_STM CDC
-            WHERE EXISTS (
+        DELETE FROM T24_TMTRAN_STM_TRIGGER CDC
+        WHERE EXISTS (
                 SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) V
-                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
-            );
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+            WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+        );
 
-            COMMIT;
-        end if;
-
-    EXCEPTION
+        COMMIT;
+    end if;
+    exception
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
-    END GEN_FROM_STM_PROC;
+   END GEN_FROM_STM_PROC;
 
 
     
