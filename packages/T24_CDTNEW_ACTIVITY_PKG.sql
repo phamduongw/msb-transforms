@@ -1,13 +1,6 @@
 CREATE OR REPLACE PACKAGE T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
-    
-    FUNCTION CALC_CBAL_VAL_FUNC(
-        P_CURR_ASSET_TYPE IN VARCHAR2,
-        P_OPEN_BALANCE    IN VARCHAR2,
-        P_CREDIT_MVMT     IN VARCHAR2,
-        P_DEBIT_MVMT      IN VARCHAR2
-    ) RETURN NUMBER;
 
-    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC;
+    PROCEDURE GEN_FROM_ACC_ARR_PROC;
 
 END T24_CDTNEW_ACTIVITY_PKG;
 
@@ -59,9 +52,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
     END CALC_CBAL_VAL_FUNC;
 
 ---------------------------------------------------------------------------
--- GEN_FROM_ACC_ARR_ECB_PROC
+-- GEN_FROM_ACC_ARR_PROC
 ---------------------------------------------------------------------------
-    PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC IS
+    PROCEDURE GEN_FROM_ACC_ARR_PROC IS
         V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
         V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
@@ -71,12 +64,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
         BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
         FROM T24_CDTNEW_ACTIVITY_ACC_ARR_ECB CDC
         WHERE EXISTS (
-            SELECT 1
-            FROM V_FMSB_ECB_MAPPED ECB
-            WHERE ECB.RECID = CDC.JOIN_KEY
-            AND ECB.WINDOW_ID >= CDC.WINDOW_ID
-        )
-        OR EXISTS (
             SELECT 1
             FROM V_FMSB_ACC_MAPPED ACC
             WHERE ACC.RECID = CDC.JOIN_KEY
@@ -88,7 +75,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
             WHERE ARR.LINKED_APPL_ID = CDC.JOIN_KEY
             AND ARR.WINDOW_ID >= CDC.WINDOW_ID
         );
-        -- ) FETCH FIRST 9999 ROWS ONLY;
+        -- ) FETCH FIRST 5000 ROWS ONLY;
         
         IF V_JOIN_KEY_LIST.COUNT > 0 THEN
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
@@ -125,77 +112,40 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 FROM GROUPED GRP
                 INNER JOIN V_FMSB_ARR_CD     ARR ON ARR.LINKED_APPL_ID = GRP.COLUMN_VALUE
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.COLUMN_VALUE
-                INNER JOIN V_FMSB_ECB_MAPPED ECB ON ECB.RECID          = GRP.COLUMN_VALUE
                 LEFT JOIN  V_FMSB_ADL_MAPPED ADL ON ADL.RECID          = ARR.RECID
                 WHERE ARR.START_DATE >= TO_DATE(V_TODAY,'YYYYMMDD')
             ),
-            AIT_PRECOMPUTED AS(
+            AIT_AGGREGATED AS (
                 SELECT 
-                    ID_COMP_1, 
-                    MAX(ID_COMP_3) AS MAX_ID_COMP_3
+                    ID_COMP_1,
+                    MAX(ID_COMP_3) AS MAX_ID_COMP_3,
+                    MAX(EFFECTIVE_RATE) KEEP (DENSE_RANK LAST ORDER BY ID_COMP_3)  AS EFFECTIVE_RATE,
+                    MAX(PERIODIC_PERIOD) KEEP (DENSE_RANK LAST ORDER BY ID_COMP_3) AS PERIODIC_PERIOD
                 FROM V_FMSB_AIT_CDTNEW AIT
-                WHERE EXISTS (
-                    SELECT 1 FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1)
-                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
-                GROUP BY ID_COMP_1 
-            ),
-            AIT_AGGREGATED AS(
-                SELECT
-                    AIT.ID_COMP_1,
-                    AIT.EFFECTIVE_RATE,
-                    AIT.PERIODIC_PERIOD
-                FROM V_FMSB_AIT_CDTNEW AIT
-                WHERE EXISTS (
-                    SELECT 1 FROM AIT_PRECOMPUTED PRE
-                    WHERE PRE.ID_COMP_1 = AIT.ID_COMP_1
-                    AND PRE.MAX_ID_COMP_3 = AIT.ID_COMP_3
-                )
-            ),
-            ATA_PRECOMPUTED AS(
-                SELECT 
-                    ID_COMP_1, 
-                    MIN(ID_COMP_3) AS MIN_ID_COMP_3
-                FROM V_FMSB_ATA_MAPPED ATA
-                WHERE EXISTS (
-                    SELECT 1 FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1)
+                WHERE AIT.ID_COMP_3 <= V_TODAY || '.9999'
+                    AND EXISTS (SELECT 1 FROM PRECOMPUTED PRE WHERE PRE.ARR_RECID = AIT.ID_COMP_1)
                 GROUP BY ID_COMP_1
             ),
-            ATA_AGGREGATED AS(
+            ATA_AGGREGATED AS (
                 SELECT
-                    ATA.ID_COMP_1,
-                    ATA.AMOUNT,
-                    ATA.TERM
+                    ID_COMP_1,
+                    MIN(ID_COMP_3) AS MIN_ID_COMP_3,
+                    MIN(AMOUNT) KEEP (DENSE_RANK FIRST ORDER BY ID_COMP_3) AS AMOUNT,
+                    MIN(TERM)   KEEP (DENSE_RANK FIRST ORDER BY ID_COMP_3) AS TERM
                 FROM V_FMSB_ATA_MAPPED ATA
-                WHERE EXISTS (
-                    SELECT 1 FROM ATA_PRECOMPUTED PRE
-                    WHERE PRE.ID_COMP_1 = ATA.ID_COMP_1
-                    AND PRE.MIN_ID_COMP_3 = ATA.ID_COMP_3
-                )
-            ),
-            CHG_PRECOMPUTED AS(
-                SELECT 
-                    ID_COMP_1, 
-                    MAX(ID_COMP_3) AS MAX_ID_COMP_3
-                FROM V_FMSB_CHG_MAPPED CHG
-                WHERE EXISTS (
-                    SELECT 1 FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = CHG.ID_COMP_1)
+                WHERE EXISTS (SELECT 1 FROM PRECOMPUTED PRE WHERE PRE.ARR_RECID = ATA.ID_COMP_1)
                 GROUP BY ID_COMP_1
             ),
-            CHG_AGGREGATED AS(
+            CHG_AGGREGATED AS (
                 SELECT
-                    CHG.ID_COMP_1,
-                    CHG.CHANGE_DATE,
-                    CHG.CHANGE_PERIOD
+                    ID_COMP_1,
+                    MAX(ID_COMP_3) AS MAX_ID_COMP_3,
+                    MAX(CHANGE_DATE) KEEP (DENSE_RANK LAST ORDER BY ID_COMP_3)   AS CHANGE_DATE,
+                    MAX(CHANGE_PERIOD) KEEP (DENSE_RANK LAST ORDER BY ID_COMP_3) AS CHANGE_PERIOD
                 FROM V_FMSB_CHG_MAPPED CHG
-                WHERE EXISTS (
-                    SELECT 1 FROM CHG_PRECOMPUTED PRE
-                    WHERE PRE.ID_COMP_1 = CHG.ID_COMP_1
-                    AND PRE.MAX_ID_COMP_3 = CHG.ID_COMP_3
-                )
-            ),
+                WHERE EXISTS (SELECT 1 FROM PRECOMPUTED PRE WHERE PRE.ARR_RECID = CHG.ID_COMP_1)
+                GROUP BY ID_COMP_1
+            )
             SELECT
                 27 AS BANKNO,
                 TO_NUMBER(PRE.ACC_RECID) AS ACCTNO,
@@ -210,7 +160,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 END AS STATUS,
                 TO_NUMBER(PRE.ACC_RECID) AS CDNUM,
                 ATA.AMOUNT AS ORGBAL,
-                CALC_CBAL_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT) AS CBAL,
+                0 AS CBAL,
                 0 AS HOLD,
                 0 AS ACCINT,
                 0 AS WDRWH,
@@ -238,9 +188,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
             FROM PRECOMPUTED PRE
             LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID
             LEFT JOIN ATA_AGGREGATED ATA ON ATA.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN CHG_AGGREGATED CHG ON CHG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN CHG_AGGREGATED CHG ON CHG.ID_COMP_1 = PRE.ARR_RECID;
 
-            DELETE FROM T24_CDTNEW_ACTIVITY_ACC_ARR_ECB CDC
+            DELETE FROM T24_CDTNEW_ACTIVITY_ACC_ARR CDC
             WHERE EXISTS (
                 SELECT 1
                 FROM TABLE(V_WINDOW_ID_LIST) TMP
@@ -254,6 +204,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
-    END GEN_FROM_ACC_ARR_ECB_PROC;
+    END GEN_FROM_ACC_ARR_PROC;
 
 END T24_CDTNEW_ACTIVITY_PKG;
