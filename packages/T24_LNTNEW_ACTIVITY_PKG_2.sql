@@ -296,6 +296,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
 ---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_ACC_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
         V_TODAY          VARCHAR2(8);
     BEGIN
         SELECT CDC.WINDOW_ID
@@ -310,6 +311,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         -- ) FETCH FIRST 5000 ROWS ONLY;
 
         IF V_WINDOW_ID_LIST.COUNT > 0 THEN
+        	SYS.DBMS_SESSION.SLEEP(0.2);
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
@@ -337,10 +339,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                     LMT.INTERNAL_AMOUNT     AS DRLIMT,
                     ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
                     ACC.OPENING_DATE        AS OPENING_DATE,
-                    ACC.WINDOW_ID           AS WINDOW_ID,
-                    ACC.COMMIT_TS           AS COMMIT_TS,
-                    ACC.REPLICAT_TS         AS REPLICAT_TS,
-                    ACC.MAPPED_TS           AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
                 JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
                 JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = ACC.RECID
@@ -471,10 +469,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
                 CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
                 'A' AS ODIND,
                 AAC.MSB_LN_PURPOSE AS PURCOD,
-                PRE.WINDOW_ID,
-                PRE.COMMIT_TS,
-                PRE.REPLICAT_TS,
-                PRE.MAPPED_TS,
+                V_CAPTURED_TIME,
                 'ACC'
             FROM PRECOMPUTED PRE
             LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
@@ -503,239 +498,229 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
     END GEN_FROM_ACC_PROC;
 
 ---------------------------------------------------------------------------
--- GEN_FROM_ARR_AIT_ASC_AAC_PROC
+-- GEN_FROM_ARR_PROC
 ---------------------------------------------------------------------------   
     PROCEDURE GEN_FROM_ARR_AIT_ASC_AAC_PROC IS
-        V_TODAY               VARCHAR2(8);
-        V_DUMMY               NUMBER;
-        V_MAPPED_TS           TIMESTAMP;
-
+        V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
+        V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
+        V_TODAY          VARCHAR2(8);
     BEGIN
-        SELECT 1 INTO V_DUMMY
-        FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC
-        WHERE ROWNUM = 1;
-
-        INSERT INTO TMP_INFLIGHT_RECORD (JOIN_KEY, WINDOW_ID)
-        SELECT JOIN_KEY, WINDOW_ID
+        SELECT CDC.JOIN_KEY, CDC.WINDOW_ID
+        BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
         FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
-        (
-            SELECT ARR.RECID AS JOIN_KEY, ARR.WINDOW_ID
-            FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
-            JOIN FMSB_ARR_MAPPED ACC ON ARR.WINDOW_ID = CDC.WINDOW_ID
-
-            UNION ALL
-
-            SELECT AIT.ID_COMP_1 AS JOIN_KEY, AIT.WINDOW_ID
-            FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
-            JOIN FMSB_AIT_LNTNEW AIT ON AIT.WINDOW_ID = CDC.WINDOW_ID
-
-            UNION ALL
-
-            SELECT ASCC.ID_COMP_1 AS JOIN_KEY, ASCC.WINDOW_ID
-            FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
-            JOIN FMSB_ASC_MAPPED ASCC ON ASCC.WINDOW_ID = CDC.WINDOW_ID
-
-            UNION ALL
-
-            SELECT AAC.ID_COMP_1 AS JOIN_KEY, AAC.WINDOW_ID
-            FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
-            JOIN FMSB_AAC_MAPPED AAC ON AIT.WINDOW_ID = CDC.WINDOW_ID
-        );
-            
-        SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
-        FROM F_DAT_MAPPED
-        WHERE RECID = 'VN0011000';
-
-        V_MAPPED_TS := SYSTIMESTAMP;
-
-        INSERT INTO T24_LNTNEW_ACTIVITY (
-            BRN, ACCTNO, LNNUM, CIFNO, ACNAME, STATUS, TYPE,
-            CURTYP, ORGAMT, DRLIMT, HOLD, CBAL, OTHCHG,
-            ACCINT, COMACC, PMTAMT, FNLPMT, BILPRN, BILINT,
-            BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
-            DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
-            ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
-            WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
-        )
-        WITH GROUPED AS (
-            SELECT JOIN_KEY
-            FROM TMP_INFLIGHT_RECORD
-            GROUP BY JOIN_KEY                
-        ),            
-        PRECOMPUTED AS (
-            SELECT /*+ MATERIALIZE */ 
-                ACC.CO_CODE             AS BRN,
-                ARR.LINKED_APPL_ID      AS ACCTNO,
-                ARR.RECID               AS ARR_RECID,
-                ACC.CUSTOMER            AS CIFNO,
-                ACC.ACNAME              AS ACNAME,
-                ARR.ARR_STATUS          AS ARR_STATUS,
-                ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
-                ARR.PRODUCT             AS PRODUCT,                
-                ACC.CURRENCY            AS CURTYP,
-                LMT.INTERNAL_AMOUNT     AS DRLIMT,
-                ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
-                ACC.OPENING_DATE        AS OPENING_DATE,
-                ARR.WINDOW_ID           AS WINDOW_ID,
-                ARR.COMMIT_TS           AS COMMIT_TS,
-                ARR.REPLICAT_TS         AS REPLICAT_TS
-            FROM GROUPED GRP
-            INNER JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.RECID = GRP.JOIN_KEY
-            INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
-            LEFT JOIN V_FMSB_LMT_MAPPED LMT ON LMT.RECID = ACC.LIMIT_KEY
-            WHERE ARR.START_DATE >= V_TODAY
-        ),             
-        ARC_AGGREGATED AS (
-            SELECT 
-                ARC.ARRANGEMENT,
-                MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
-                MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT
-            FROM V_FMSB_ARC_LNTNEW ARC
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = ARC.ARRANGEMENT
-            )
-            AND EFFECTIVE_DATE <= TO_DATE(V_TODAY, 'YYYYMMDD')
-            GROUP BY ARC.ARRANGEMENT
-        ),
-        ATA_AGGREGATED AS (
-            SELECT 
-                ATA.ID_COMP_1,
-                MIN(ATA.ID_COMP_3) AS MIN_ID_COMP_3,
-                MAX(CASE 
-                        WHEN ATA.ACTIVITY IN ('LENDING-NEW-ARRANGEMENT','LENDING-TAKEOVER-ARRANGEMENT')
-                        THEN TO_NUMBER(ATA.AMOUNT)
-                        ELSE 0
-                    END) AS MAX_AMOUNT
-            FROM V_FMSB_ATA_MAPPED ATA
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-            )
-            GROUP BY ATA.ID_COMP_1
-        ),
-        ASC_AGGREGATED AS(
-            SELECT 
-                ASCC.ID_COMP_1,
-                MAX(ASCC.ID_COMP_3) AS MAX_ID_COMP_3
-            FROM V_FMSB_ASC_MAPPED ASCC
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
-            )
-            GROUP BY ASCC.ID_COMP_1
-        ),
-        AIT_AGGREGATED AS(
-            SELECT
-                AIT.ID_COMP_1,
-                TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
-                ROW_NUMBER() OVER (
-                    PARTITION BY AIT.ID_COMP_1
-                    ORDER BY AIT.ID_COMP_3 DESC,
-                            CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
-                                THEN TO_NUMBER(AIT.ID_COMP_3)
-                                ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
-                            END DESC
-                ) AS RN
-            FROM V_FMSB_AIT_LNTNEW AIT
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = AIT.ID_COMP_1
-            )
-            AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
-        ),
-        AAC_AGGREGATED AS(
-            SELECT 
-                AAC.ID_COMP_1,
-                MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
-            FROM V_FMSB_AAC_MAPPED AAC
-            WHERE EXISTS (
-                SELECT 1
-                FROM PRECOMPUTED PRE
-                WHERE PRE.ARR_RECID = AAC.ID_COMP_1
-            )
-            AND ID_COMP_3 <= V_TODAY || '.9999'
-            GROUP BY AAC.ID_COMP_1
-        )
-        SELECT
-            PRE.BRN AS BRN,
-            TO_NUMBER(PRE.ACCTNO) AS ACCTNO,
-            0 AS LNNUM,
-            TO_NUMBER(PRE.CIFNO) AS CIFNO,
-            TRIM(PRE.ACNAME) AS ACNAME,
-            CASE
-                WHEN PRE.ARR_STATUS IN ('CLOSE', 'PENDING.CLOSURE', 'CANCELLED') THEN 2
-                ELSE 4
-            END AS STATUS,
-            CALC_TYPE_VAL_FUNC(PRE.PRODUCT_STATUS, PRE.PRODUCT) AS TYPE,
-            PRE.CURTYP AS CURTYP,
-            ATA_AGG.MAX_AMOUNT AS ORGAMT,
-            TO_NUMBER(PRE.DRLIMT) AS DRLIMT,
-            0 AS HOLD,
-            0 AS CBAL,
-            0 AS OTHCHG,
-            0 AS ACCINT,
-            0 AS COMACC,
-            CALC_PMTAMT_VAL_FUNC(ASCC.CALC_AMOUNT) AS PMTAMT,
-            '' AS FNLPMT,
-            0 AS BILPRN,
-            0 AS BILINT,
-            0 AS BILESC,
-            0 AS BILLC,
-            0 AS BILOC,
-            0 AS BILMC,
-            0 AS BILLCO,
-            0 AS YSOBAL,
-            TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
-            NVL(
-                TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')),
-                TO_NUMBER(TO_CHAR(TO_DATE(V_TODAY, 'YYYYMMDD'), 'YYYYDDD'))
-            ) AS FRELDT,
-            NVL(
-                TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')),
-                TO_NUMBER(TO_CHAR(TO_DATE(V_TODAY, 'YYYYMMDD'), 'YYYYDDD'))
-            ) AS FULLDT,
-            TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
-            AIT.RATE AS RATE,
-            '' AS LCTYPE,
-            '' AS ACCMLC,
-            SUBSTR(ATA.TERM, 1, LENGTH(ATA.TERM)-1) AS TERM,
-            SUBSTR(ATA.TERM, -1) AS TMCODE,
-            CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS FREQ,
-            CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
-            'A' AS ODIND,
-            AAC.MSB_LN_PURPOSE AS PURCOD,
-            PRE.WINDOW_ID,
-            PRE.COMMIT_TS,
-            PRE.REPLICAT_TS,
-            V_MAPPED_TS,
-            'ARR_AIT_ASC_AAC'
-        FROM PRECOMPUTED PRE
-        LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1
-        LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
-        LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
-        LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
-        LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
-        LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
-        LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
-        LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3;
-
-        DELETE FROM T24_LNTNEW_ACTIVITY_ARR_AIT_ASC_AAC CDC
         WHERE EXISTS (
             SELECT 1
-            FROM TMP_INFLIGHT_RECORD TMP
-            WHERE CDC.WINDOW_ID = TMP.WINDOW_ID
+            FROM V_FMSB_ARR_LNTNEW ARR
+            WHERE ARR.LINKED_APPL_ID = CDC.JOIN_KEY
+            AND ARR.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_AIT_LNTNEW AIT
+            WHERE AIT.ID_COMP_1 = CDC.JOIN_KEY
+            AND AIT.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_ASC_MAPPED ASCC
+            WHERE ASCC.ID_COMP_1 = CDC.JOIN_KEY
+            AND ASCC.WINDOW_ID >= CDC.WINDOW_ID
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM V_FMSB_AAC_MAPPED AAC
+            WHERE AAC.ID_COMP_1 = CDC.JOIN_KEY
+            AND AAC.WINDOW_ID >= CDC.WINDOW_ID
         );
+        -- ) FETCH FIRST 5000 ROWS ONLY;
 
-        COMMIT;
+        IF V_JOIN_KEY_LIST.COUNT > 0 THEN
+        	SYS.DBMS_SESSION.SLEEP(0.2);
+            SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
+            FROM F_DAT_MAPPED
+            WHERE RECID = 'VN0011000';
+
+            INSERT INTO T24_LNTNEW_ACTIVITY (
+                BRN, ACCTNO, LNNUM, CIFNO, ACNAME, STATUS, TYPE,
+                CURTYP, ORGAMT, DRLIMT, HOLD, CBAL, OTHCHG,
+                ACCINT, COMACC, PMTAMT, FNLPMT, BILPRN, BILINT,
+                BILESC, BILLC, BILOC, BILMC, BILLCO, YSOBAL,
+                DATOPN, FRELDT, FULLDT, MATDT, RATE, LCTYPE,
+                ACCMLC, TERM, TMCODE, FREQ, IPFREQ, ODIND, PURCOD,
+                WINDOW_ID, COMMIT_TS, REPLICAT_TS, MAPPED_TS, CALL_CDC
+            )
+            WITH GROUPED AS (
+                SELECT DISTINCT COLUMN_VALUE
+                FROM TABLE(V_JOIN_KEY_LIST)
+            ),
+            WITH  PRECOMPUTED AS (
+                SELECT /*+ MATERIALIZE */
+                    ACC.CO_CODE             AS BRN,
+                    ARR.LINKED_APPL_ID      AS ACCTNO,
+                    ARR.RECID               AS ARR_RECID,
+                    ACC.CUSTOMER            AS CIFNO,
+                    ACC.ACNAME              AS ACNAME,
+                    ARR.ARR_STATUS          AS ARR_STATUS,
+                    ARR.PRODUCT_STATUS      AS PRODUCT_STATUS, 
+                    ARR.PRODUCT             AS PRODUCT,                
+                    ACC.CURRENCY            AS CURTYP,
+                    LMT.INTERNAL_AMOUNT     AS DRLIMT,
+                    ARR.ORIG_CONTRACT_DATE  AS ORIG_CONTRACT_DATE,
+                    ACC.OPENING_DATE        AS OPENING_DATE,
+                FROM GROUPED GRP
+                INNER JOIN V_FMSB_ARR_LNTNEW ARR ON ARR.LINKED_APPL_ID = GRP.COLUMN_VALUE
+                INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.COLUMN_VALUE
+                LEFT JOIN V_FMSB_LMT_MAPPED LMT  ON LMT.RECID          = ACC.LIMIT_KEY
+                WHERE ARR.START_DATE >= V_TODAY
+            ),
+            ARC_AGGREGATED AS (
+                SELECT 
+                    ARC.ARRANGEMENT,
+                    MIN(ARC.EFFECTIVE_DATE) AS MIN_EFF_DAT,
+                    MAX(ARC.EFFECTIVE_DATE) AS MAX_EFF_DAT
+                FROM V_FMSB_ARC_LNTNEW ARC
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ARC.ARRANGEMENT
+                )
+                AND EFFECTIVE_DATE <= TO_DATE(V_TODAY, 'YYYYMMDD')
+                GROUP BY ARC.ARRANGEMENT
+            ),
+            ATA_AGGREGATED AS (
+                SELECT 
+                    ATA.ID_COMP_1,
+                    MIN(ATA.ID_COMP_3) AS MIN_ID_COMP_3,
+                    MAX(CASE 
+                            WHEN ATA.ACTIVITY IN ('LENDING-NEW-ARRANGEMENT','LENDING-TAKEOVER-ARRANGEMENT')
+                            THEN TO_NUMBER(ATA.AMOUNT)
+                            ELSE 0
+                        END) AS MAX_AMOUNT
+                FROM V_FMSB_ATA_MAPPED ATA
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
+                )
+                GROUP BY ATA.ID_COMP_1
+            ),
+            ASC_AGGREGATED AS(
+                SELECT 
+                    ASCC.ID_COMP_1,
+                    MAX(ASCC.ID_COMP_3) AS MAX_ID_COMP_3
+                FROM V_FMSB_ASC_MAPPED ASCC
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ASCC.ID_COMP_1
+                )
+                GROUP BY ASCC.ID_COMP_1
+            ),
+            AIT_AGGREGATED AS(
+                SELECT
+                    AIT.ID_COMP_1,
+                    TO_NUMBER(AIT.EFFECTIVE_RATE)/100 AS RATE,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY AIT.ID_COMP_1
+                        ORDER BY AIT.ID_COMP_3 DESC,
+                                CASE WHEN AIT.ID_COMP_2 = 'LOANINTEREST'
+                                    THEN TO_NUMBER(AIT.ID_COMP_3)
+                                    ELSE TO_NUMBER(AIT.ID_COMP_3) - 1
+                                END DESC
+                    ) AS RN
+                FROM V_FMSB_AIT_LNTNEW AIT
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AIT.ID_COMP_1
+                )
+                AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
+            ),
+            AAC_AGGREGATED AS(
+                SELECT 
+                    AAC.ID_COMP_1,
+                    MAX(AAC.ID_COMP_3) AS MAX_ID_COMP_3
+                FROM V_FMSB_AAC_MAPPED AAC
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = AAC.ID_COMP_1
+                )
+                AND ID_COMP_3 <= V_TODAY || '.9999'
+                GROUP BY AAC.ID_COMP_1
+            )
+            SELECT
+                PRE.BRN AS BRN,
+                TO_NUMBER(PRE.ACCTNO) AS ACCTNO,
+                0 AS LNNUM,
+                TO_NUMBER(PRE.CIFNO) AS CIFNO,
+                TRIM(PRE.ACNAME) AS ACNAME,
+                CASE
+                    WHEN PRE.ARR_STATUS IN ('CLOSE', 'PENDING.CLOSURE', 'CANCELLED') THEN 2
+                    ELSE 4
+                END AS STATUS,
+                CALC_TYPE_VAL_FUNC(PRE.PRODUCT_STATUS, PRE.PRODUCT) AS TYPE,
+                PRE.CURTYP AS CURTYP,
+                ATA_AGG.MAX_AMOUNT AS ORGAMT,
+                TO_NUMBER(PRE.DRLIMT) AS DRLIMT,
+                0 AS HOLD,
+                0 AS CBAL,
+                0 AS OTHCHG,
+                0 AS ACCINT,
+                0 AS COMACC,
+                CALC_PMTAMT_VAL_FUNC(ASCC.CALC_AMOUNT) AS PMTAMT,
+                '' AS FNLPMT,
+                0 AS BILPRN,
+                0 AS BILINT,
+                0 AS BILESC,
+                0 AS BILLC,
+                0 AS BILOC,
+                0 AS BILMC,
+                0 AS BILLCO,
+                0 AS YSOBAL,
+                TO_NUMBER(TO_CHAR(NVL(PRE.ORIG_CONTRACT_DATE, PRE.OPENING_DATE), 'YYYYDDD')) AS DATOPN,
+                NVL(
+                    TO_NUMBER(TO_CHAR(ARC.MIN_EFF_DAT, 'YYYYDDD')),
+                    TO_NUMBER(TO_CHAR(TO_DATE(V_TODAY, 'YYYYMMDD'), 'YYYYDDD'))
+                ) AS FRELDT,
+                NVL(
+                    TO_NUMBER(TO_CHAR(ARC.MAX_EFF_DAT, 'YYYYDDD')),
+                    TO_NUMBER(TO_CHAR(TO_DATE(V_TODAY, 'YYYYMMDD'), 'YYYYDDD'))
+                ) AS FULLDT,
+                TO_NUMBER(TO_CHAR(NVL(ATA.MSB_OR_LNMAT_DT, ATA.MATURITY_DATE), 'YYYYDDD')) AS MATDT,
+                AIT.RATE AS RATE,
+                '' AS LCTYPE,
+                '' AS ACCMLC,
+                SUBSTR(ATA.TERM, 1, LENGTH(ATA.TERM)-1) AS TERM,
+                SUBSTR(ATA.TERM, -1) AS TMCODE,
+                CALC_FREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS FREQ,
+                CALC_IPFREQ_VAL_FUNC(ASCC.BILL_TYPE, ASCC.PROPERTY, ASCC.PAYMENT_FREQ) AS IPFREQ,
+                'A' AS ODIND,
+                AAC.MSB_LN_PURPOSE AS PURCOD,
+                V_CAPTURED_TIME,                
+                '5'
+            FROM PRECOMPUTED PRE
+            LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
+            LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN ASC_AGGREGATED ASCC_AGG ON ASCC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_ASC_MAPPED ASCC ON ASCC.ID_COMP_1 = ASCC_AGG.ID_COMP_1 AND ASCC.ID_COMP_3 = ASCC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AAC_AGGREGATED AAC_AGG ON AAC_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_AAC_MAPPED AAC ON AAC.ID_COMP_1 = AAC_AGG.ID_COMP_1 AND AAC.ID_COMP_3 = AAC_AGG.MAX_ID_COMP_3
+            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID AND AIT.RN = 1;
+
+            DELETE FROM T24_LNTNEW_ACTIVITY_ARR CDC
+            WHERE EXISTS (
+                SELECT 1
+                FROM TABLE(V_WINDOW_ID_LIST) V
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
+            );
+
+            COMMIT;
+        END IF;
 
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            RETURN;
         WHEN OTHERS THEN
             ROLLBACK;
             RAISE;
