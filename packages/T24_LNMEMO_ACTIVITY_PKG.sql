@@ -158,7 +158,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     PROCEDURE GEN_FROM_ACC_ARR_ECB_PROC IS
         V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
     BEGIN
         SELECT CDC.JOIN_KEY, CDC.WINDOW_ID
         BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
@@ -182,7 +181,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
             AND ARR.WINDOW_ID >= CDC.WINDOW_ID
         );
         -- ) FETCH FIRST 9999 ROWS ONLY;
-        
+
         IF V_JOIN_KEY_LIST.COUNT > 0 THEN
             INSERT INTO T24_LNMEMO_ACTIVITY (
                 ACCTNO,
@@ -199,7 +198,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 BILLC,
                 BILOC,
                 BILMC,
-                CAPTURED_TIME,
+                WINDOW_ID,
+                COMMIT_TS,
+                REPLICAT_TS,
+                MAPPED_TS,
                 CALL_CDC
             )
             WITH GROUPED AS (
@@ -216,7 +218,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                     ECB.CREDIT_MVMT     AS CREDIT_MVMT,
                     ECB.DEBIT_MVMT      AS DEBIT_MVMT,
                     ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT
+                    LMT.INTERNAL_AMOUNT AS DRLIMT,
+                    LEAST(ARR.WINDOW_ID, ACC.WINDOW_ID, ECB.WINDOW_ID)       AS WINDOW_ID,
+                    LEAST(ARR.COMMIT_TS, ACC.COMMIT_TS, ECB.COMMIT_TS)       AS COMMIT_TS,
+                    LEAST(ARR.REPLICAT_TS, ACC.REPLICAT_TS, ECB.REPLICAT_TS) AS REPLICAT_TS,
+                    LEAST(ARR.MAPPED_TS, ACC.MAPPED_TS, ECB.MAPPED_TS)       AS MAPPED_TS
                 FROM GROUPED GRP
                 INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.LINKED_APPL_ID = GRP.COLUMN_VALUE
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID          = GRP.COLUMN_VALUE
@@ -252,8 +258,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 AGG.BILLC, -- BILLC
                 0, -- BILOC
                 0, -- BILMC
-                V_CAPTURED_TIME, -- CAPTURED_TIME
-                '1' -- CALL_CDC
+                PRE.WINDOW_ID, -- WINDOW_ID
+                PRE.COMMIT_TS, -- COMMIT_TS
+                PRE.REPLICAT_TS, -- REPLICAT_TS
+                PRE.MAPPED_TS, -- MAPPED_TS
+                'ACC_ARR_ECB' -- CALL_CDC
             FROM PRECOMPUTED PRE
             LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
 
@@ -278,7 +287,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     PROCEDURE GEN_FROM_BIL_PROC IS
         V_JOIN_KEY_LIST  T_JOIN_KEY_ARRAY;
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
     BEGIN
         SELECT CDC.ARRANGEMENT_ID, CDC.WINDOW_ID
         BULK COLLECT INTO V_JOIN_KEY_LIST, V_WINDOW_ID_LIST
@@ -307,15 +315,22 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 BILLC,
                 BILOC,
                 BILMC,
-                CAPTURED_TIME,
+                WINDOW_ID,
+                COMMIT_TS,
+                REPLICAT_TS,
+                MAPPED_TS,
                 CALL_CDC
             )
             WITH AGGREGATED AS (
                 SELECT
                     BIL.ARRANGEMENT_ID,
-                    SUM(BILPRN_AMT) AS BILPRN,
-                    SUM(BILINT_AMT) AS BILINT,
-                    SUM(BILLC_AMT)  AS BILLC
+                    SUM(BILPRN_AMT)  AS BILPRN,
+                    SUM(BILINT_AMT)  AS BILINT,
+                    SUM(BILLC_AMT)   AS BILLC,
+                    MIN(WINDOW_ID)   AS WINDOW_ID,
+                    MIN(COMMIT_TS)   AS COMMIT_TS,
+                    MIN(REPLICAT_TS) AS REPLICAT_TS,
+                    MIN(MAPPED_TS)   AS MAPPED_TS
                 FROM V_FMSB_BIL_LNMEMO BIL
                 WHERE EXISTS (
                     SELECT 1
@@ -339,8 +354,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 AGG.BILLC, -- BILLC
                 0, -- BILOC
                 0, -- BILMC
-                V_CAPTURED_TIME, -- CAPTURED_TIME
-                '2' -- CALL_CDC
+                AGG.WINDOW_ID, -- WINDOW_ID
+                AGG.COMMIT_TS, -- COMMIT_TS
+                AGG.REPLICAT_TS, -- REPLICAT_TS
+                AGG.MAPPED_TS, -- MAPPED_TS
+                'BIL' -- CALL_CDC
             FROM AGGREGATED AGG
             INNER JOIN V_FMSB_ARR_LNMEMO ARR ON ARR.RECID = AGG.ARRANGEMENT_ID
             INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
@@ -367,7 +385,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
     ---------------------------------------------------------------------------
     PROCEDURE GEN_FROM_LMT_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
-        V_CAPTURED_TIME  TIMESTAMP := SYSTIMESTAMP;
     BEGIN
         SELECT CDC.WINDOW_ID
         BULK COLLECT INTO V_WINDOW_ID_LIST
@@ -396,7 +413,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 BILLC,
                 BILOC,
                 BILMC,
-                CAPTURED_TIME,
+                WINDOW_ID,
+                COMMIT_TS,
+                REPLICAT_TS,
+                MAPPED_TS,
                 CALL_CDC
             )
             WITH PRECOMPUTED AS (
@@ -409,7 +429,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                     ECB.CREDIT_MVMT     AS CREDIT_MVMT,
                     ECB.DEBIT_MVMT      AS DEBIT_MVMT,
                     ACC.LOCKED_AMOUNT   AS LOCKED_AMOUNT,
-                    LMT.INTERNAL_AMOUNT AS DRLIMT
+                    LMT.INTERNAL_AMOUNT AS DRLIMT,
+                    LMT.WINDOW_ID       AS WINDOW_ID,
+                    LMT.COMMIT_TS       AS COMMIT_TS,
+                    LMT.REPLICAT_TS     AS REPLICAT_TS,
+                    LMT.MAPPED_TS       AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) TMP
                 INNER JOIN V_FMSB_LMT_MAPPED LMT ON LMT.WINDOW_ID      = TMP.COLUMN_VALUE
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.LIMIT_KEY      = LMT.RECID
@@ -445,8 +469,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 AGG.BILLC, -- BILLC
                 0, -- BILOC
                 0, -- BILMC
-                V_CAPTURED_TIME, -- CAPTURED_TIME
-                '3' -- CALL_CDC
+                PRE.WINDOW_ID, -- WINDOW_ID
+                PRE.COMMIT_TS, -- COMMIT_TS
+                PRE.REPLICAT_TS, -- REPLICAT_TS
+                PRE.MAPPED_TS, -- MAPPED_TS
+                'LMT' -- CALL_CDC
             FROM PRECOMPUTED PRE
             LEFT JOIN AGGREGATED AGG ON AGG.ARRANGEMENT_ID = PRE.ARR_RECID;
 
