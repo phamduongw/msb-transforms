@@ -234,13 +234,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
             ELSE 1
         END TMTIMENT,
         CASE
-            WHEN stm.CURRENCY = 'VND' THEN ABS(stm.AMOUNT_LCY)
-            WHEN stm.CURRENCY <> 'VND' THEN ABS(stm.AMOUNT_FCY)
+            WHEN stm.CURRENCY = 'VND' THEN ABS(nvl(stm.AMOUNT_LCY,0))
+            WHEN stm.CURRENCY <> 'VND' THEN ABS(nvl(stm.AMOUNT_FCY,0))
             ELSE 0
         END TMORGAMT,
         CASE
-            WHEN stm.CURRENCY = 'VND' THEN ABS(stm.AMOUNT_LCY)
-            WHEN stm.CURRENCY <> 'VND' THEN ABS(stm.AMOUNT_FCY)
+            WHEN stm.CURRENCY = 'VND' THEN ABS(nvl(stm.AMOUNT_LCY,0))
+            WHEN stm.CURRENCY <> 'VND' THEN ABS(nvl(stm.AMOUNT_FCY,0))
             ELSE 0
         END TMTXAMT,
                 stm.CURRENCY TMGLCUR,
