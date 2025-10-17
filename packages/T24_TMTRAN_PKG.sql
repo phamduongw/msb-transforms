@@ -193,29 +193,34 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                     when stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') - 1 then 'PT'
                     when stm.RECORD_STATUS = 'REVE'
                     and stm.BOOKING_DATE = to_date(V_TODAY, 'YYYYMMDD') then 'CE'
+                    else ''
                 end TMTXSTAT,
                 case
-                    when stm.SYSTEM_ID = 'FT' then ft.MSB_TRANS_SEQ
-                    when stm.SYSTEM_ID = 'AC' then ac.MSB_TRANS_SEQ
-                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED1,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.SEQ'))
+                    when stm.SYSTEM_ID = 'FT' then nvl(ft.MSB_TRANS_SEQ,'')
+                    when stm.SYSTEM_ID = 'AC' then nvl(ac.MSB_TRANS_SEQ,'')
+                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(nvl(tmv.RESERVED1,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.SEQ')),'')
+                    else ''
                 end TMOFFSET,
                 -- bo xung them PO 
                 CASE
                     WHEN stm.PRODUCT_CATEGORY = '12800' THEN 'y'
+                    else ''
                 END TMIBTTRN,
                 CASE
                     WHEN stm.PRODUCT_CATEGORY IN ('14016', '18711', '8712') THEN 'E'
                     WHEN stm.PRODUCT_CATEGORY = '12800' THEN 'I'
                     WHEN stm.PRODUCT_CATEGORY = '56101' THEN 'P'
+                    else ''
                 END TMEQVTRN,
-                por.OUTPUT_CHANNEL TMSUMTRN,
-                nvl(stm.INPUTTER,'0') TMTELLID,
+                nvl(por.OUTPUT_CHANNEL,'') TMSUMTRN,
+                nvl(stm.INPUTTER,'') TMTELLID,
                 stm.recid TMTXSEQ,
                 CASE
-                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(tmv.RESERVED2,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.CODE'))
-                    WHEN stm.SYSTEM_ID = 'FT' THEN ft.MSB_TRANS_CODE
+                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(nvl(tmv.RESERVED2,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.CODE')),'')
+                    WHEN stm.SYSTEM_ID = 'FT' THEN nvl(ft.MSB_TRANS_CODE,'')
                     WHEN stm.SYSTEM_ID = 'AC'
-                    AND SUBSTR(stm.TRANS_REFERENCE, 1, 3) = 'CHG' THEN ac.MSB_TRANS_CODE
+                    AND SUBSTR(stm.TRANS_REFERENCE, 1, 3) = 'CHG' THEN nvl(ac.MSB_TRANS_CODE,'')
+                    else ''
                 END TMTXCD,
                 nvl(to_number(TO_CHAR(BOOKING_DATE,'YYYYDDD')),0) TMENTDT7,
         nvl(to_number(TO_CHAR(VALUE_DATE,'YYYYDDD')),0) TMEFFDT7,
@@ -226,10 +231,11 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                 ELSE 'D'
             END
             WHEN acc.PRODUCT_LINE = 'LENDING' THEN 'L'
+            else ''
         END TMAPPTYPE,
-        to_number(stm.TRANSACTION_CODE) TMHOSTTXCD,
+        nvl(to_number(stm.TRANSACTION_CODE),0) TMHOSTTXCD,
         CASE
-            WHEN trunc(cast(stm.DATE_TIME as date)) = stm.BOOKING_DATE THEN to_number(REPLACE(TO_CHAR(stm.date_time,'HH24:MI:SS'),':',''))
+            WHEN trunc(cast(stm.DATE_TIME as date)) = stm.BOOKING_DATE THEN nvl(to_number(REPLACE(TO_CHAR(stm.date_time,'HH24:MI:SS'),':','')),0)
             WHEN trunc(cast(stm.DATE_TIME as date)) > stm.BOOKING_DATE THEN 235959
             ELSE 1
         END TMTIMENT,
@@ -243,8 +249,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
             WHEN stm.CURRENCY <> 'VND' THEN ABS(nvl(stm.AMOUNT_FCY,0))
             ELSE 0
         END TMTXAMT,
-                stm.CURRENCY TMGLCUR,
-                CASE WHEN substr(stm.ACCOUNT_NUMBER,0,1) = '0'  THEN substr(stm.ACCOUNT_NUMBER,2) ELSE stm.ACCOUNT_NUMBER end  TMACCTNO,
+                nvl(stm.CURRENCY,'') TMGLCUR,
+                CASE WHEN substr(stm.ACCOUNT_NUMBER,0,1) = '0'  THEN nvl(substr(stm.ACCOUNT_NUMBER,2),'') ELSE nvl(stm.ACCOUNT_NUMBER,'') end  TMACCTNO,
                 CASE
                     WHEN stm.CURRENCY <> 'VND' THEN CASE
                         WHEN nvl(stm.AMOUNT_FCY,0) < 0 THEN 'D'
@@ -259,7 +265,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                 CASE
                     WHEN stm.TRANS_REFERENCE LIKE 'CHG%' THEN CASE
                         WHEN stm.TRANSACTION_CODE = '5021' THEN 'VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
-                        ELSE REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
+                        ELSE REGEXP_REPLACE(regexp_replace(cast(nvl(ac.REMARKS,'') as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
                     END
                     WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN 'Chuyen tien tu dong - ' || stm.THEIR_REFERENCE
                     WHEN stm.SYSTEM_ID IN ('LCM', 'LCC', 'LCD', 'MD') THEN CASE
@@ -273,12 +279,12 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                     WHEN stm.SYSTEM_ID = 'FT' THEN CASE
                         WHEN stm.TRANSACTION_CODE = '422' THEN stm.NARRATIVE_1 || '# Thu phi - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
                         WHEN stm.TRANSACTION_CODE = '5021' THEN stm.NARRATIVE_1 || '# VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
-                        ELSE stm.NARRATIVE
+                        ELSE nvl(stm.NARRATIVE,'')
                     END
-                    ELSE stm.NARRATIVE
+                    ELSE nvl(stm.NARRATIVE,'')
                 END TMEFTH,
-                TO_CHAR(stm.DATE_TIME,'yyyyMMddHH24miss') TMRESV07,
-                regexp_replace(stm.trans_reference,'\\[0-9A-Z]+$') TMTKTN,
+                TO_CHAR(nvl(stm.DATE_TIME,''),'yyyyMMddHH24miss') TMRESV07,
+                regexp_replace(nvl(stm.trans_reference,''),'\\[0-9A-Z]+$') TMTKTN,
                 stm.WINDOW_ID ,
                 stm.COMMIT_TS, 
                 stm.REPLICAT_TS, 
