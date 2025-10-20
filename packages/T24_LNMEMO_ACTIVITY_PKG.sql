@@ -252,10 +252,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
                 0, -- COMACC
                 0, -- OTHCHG
-                AGG.BILPRN, -- BILPRN
-                AGG.BILINT, -- BILINT
+                NVL(AGG.BILPRN, 0), -- BILPRN
+                NVL(AGG.BILINT, 0), -- BILINT
                 0, -- BILESC
-                AGG.BILLC, -- BILLC
+                NVL(AGG.BILLC, 0), -- BILLC
                 0, -- BILOC
                 0, -- BILMC
                 PRE.WINDOW_ID, -- WINDOW_ID
@@ -348,10 +348,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 CALC_ACCINT_VAL_FUNC(ECB.CURR_ASSET_TYPE, ECB.OPEN_BALANCE, ECB.CREDIT_MVMT, ECB.DEBIT_MVMT), -- ACCINT
                 0, -- COMACC
                 0, -- OTHCHG
-                AGG.BILPRN, -- BILPRN
-                AGG.BILINT, -- BILINT
+                NVL(AGG.BILPRN, 0), -- BILPRN
+                NVL(AGG.BILINT, 0), -- BILINT
                 0, -- BILESC
-                AGG.BILLC, -- BILLC
+                NVL(AGG.BILLC, 0), -- BILLC
                 0, -- BILOC
                 0, -- BILMC
                 AGG.WINDOW_ID, -- WINDOW_ID
@@ -463,10 +463,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG IS
                 CALC_ACCINT_VAL_FUNC(PRE.CURR_ASSET_TYPE, PRE.OPEN_BALANCE, PRE.CREDIT_MVMT, PRE.DEBIT_MVMT), -- ACCINT
                 0, -- COMACC
                 0, -- OTHCHG
-                AGG.BILPRN, -- BILPRN
-                AGG.BILINT, -- BILINT
+                NVL(AGG.BILPRN, 0), -- BILPRN
+                NVL(AGG.BILINT, 0), -- BILINT
                 0, -- BILESC
-                AGG.BILLC, -- BILLC
+                NVL(AGG.BILLC, 0), -- BILLC
                 0, -- BILOC
                 0, -- BILMC
                 PRE.WINDOW_ID, -- WINDOW_ID
