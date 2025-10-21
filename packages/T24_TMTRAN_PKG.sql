@@ -216,7 +216,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                 nvl(stm.INPUTTER,' ') TMTELLID,
                 stm.recid TMTXSEQ,
                 CASE
-                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(nvl(tmv.RESERVED2,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.CODE')),'')
+                    WHEN stm.SYSTEM_ID = 'PP' THEN nvl(nvl(tmv.RESERVED2,CALC_PP_VAL_FUNC(sup.LOC_FIELD_NAME,substr(sup.LOC_FIELD_VALUE,1,4000),'MSB.TRANS.CODE')),' ')
                     WHEN stm.SYSTEM_ID = 'FT' THEN nvl(ft.MSB_TRANS_CODE,' ')
                     WHEN stm.SYSTEM_ID = 'AC'
                     AND SUBSTR(stm.TRANS_REFERENCE, 1, 3) = 'CHG' THEN nvl(ac.MSB_TRANS_CODE,' ')
