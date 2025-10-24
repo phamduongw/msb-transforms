@@ -23,7 +23,7 @@ CREATE OR REPLACE PACKAGE T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
 
     PROCEDURE GEN_FROM_ACC_PROC;
 
-    PROCEDURE GEN_FROM_ARR_AIT_ASC_AAC_PROC;
+    PROCEDURE GEN_FROM_ARR_AIT_ASC_AAC_ATA_PROC;
 
 END T24_LNTNEW_ACTIVITY_PKG;
 
@@ -302,7 +302,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         WHERE EXISTS (
             SELECT 1
             FROM V_FMSB_ACC_MAPPED ACC
-            AND CDC.WINDOW_ID = ACC.WINDOW_ID
+            WHERE CDC.WINDOW_ID = ACC.WINDOW_ID
         );
         -- ) FETCH FIRST 5000 ROWS ONLY;
 
@@ -406,6 +406,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             ),
             ASC_AGGREGATED AS(
                 SELECT
+                	ASCC.ID_COMP_1,
                     ASCC.CALC_AMOUNT,
                     ASCC.BILL_TYPE, 
                     ASCC.PROPERTY, 
@@ -456,6 +457,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             ),
             AAC_AGGREGATED AS(
                 SELECT
+                	AAC.ID_COMP_1,
                     AAC.MSB_LN_PURPOSE,
                     AAC.WINDOW_ID,
                     AAC.COMMIT_TS,
@@ -554,27 +556,27 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
         WHERE EXISTS (
             SELECT 1
             FROM V_FMSB_ARR_LNTNEW ARR
-            AND ARR.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ARR.WINDOW_ID = CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_AIT_LNTNEW AIT
-            AND AIT.WINDOW_ID = CDC.WINDOW_ID
+            WHERE AIT.WINDOW_ID = CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_ASC_MAPPED ASCC
-            AND ASCC.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ASCC.WINDOW_ID = CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_AAC_MAPPED AAC
-            AND AAC.WINDOW_ID = CDC.WINDOW_ID
+            WHERE AAC.WINDOW_ID = CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_ATA_MAPPED ATA
-            AND ATA.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ATA.WINDOW_ID = CDC.WINDOW_ID
         );
         -- ) FETCH FIRST 5000 ROWS ONLY;
 
@@ -694,6 +696,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             ),
             ASC_AGGREGATED AS(
                 SELECT
+                	ASCC.ID_COMP_1,
                     ASCC.CALC_AMOUNT,
                     ASCC.BILL_TYPE, 
                     ASCC.PROPERTY, 
@@ -747,6 +750,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_LNTNEW_ACTIVITY_PKG IS
             ),
             AAC_AGGREGATED AS(
                 SELECT
+                	AAC.ID_COMP_1,
                     AAC.MSB_LN_PURPOSE,
                     AAC.WINDOW_ID,
                     AAC.COMMIT_TS,
