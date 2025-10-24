@@ -99,10 +99,8 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 	where EXISTS (
 	    select 1
 	    from T24_TMTRAN_STM_TRIGGER tpor
-	    join F_POR_MAPPED por on tpor.JOIN_KEY = por.recid AND por.OUTPUT_CHANNEL is not null
-	    left join F_SUP_MAPPED sup on tpor.JOIN_KEY = sup.recid
-	    left join F_TMV_TMTRAN tmv on tpor.JOIN_KEY = tmv.ORIGINAL_FT_NUMBER   
-	where cdc.JOIN_KEY = nvl(por.recid,nvl(sup.recid,tmv.ORIGINAL_FT_NUMBER))
+	    join F_POR_MAPPED por on tpor.JOIN_KEY = por.recid   
+	where por.STATUS_CODE IN ('999', '677', '687','680','988','993','996') and cdc.JOIN_KEY = por.recid 
 	)) cdc
 	where EXISTS (
 	    select 1
@@ -264,24 +262,24 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                 nvl(REGEXP_SUBSTR(stm.RECID, '[^.]+', 1, 2),' ') TMSSEQ,
                 CASE
                     WHEN stm.TRANS_REFERENCE LIKE 'CHG%' THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN 'VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
-                        ELSE REGEXP_REPLACE(regexp_replace(cast(nvl(ac.REMARKS,' ') as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN substr('VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')1,500)
+                        ELSE substr(REGEXP_REPLACE(regexp_replace(cast(nvl(ac.REMARKS,' ') as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
                     END
-                    WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN 'Chuyen tien tu dong - ' || stm.THEIR_REFERENCE
+                    WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN substr('Chuyen tien tu dong - ' || stm.THEIR_REFERENCE,1,500)
                     WHEN stm.SYSTEM_ID IN ('LCM', 'LCC', 'LCD', 'MD') THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN tr.NARRATIVE_1 || ' ' || stm.OUR_REFERENCE
-                        ELSE tr.NARRATIVE_2 || ' ' || stm.OUR_REFERENCE
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN substr(tr.NARRATIVE_1 || ' ' || stm.OUR_REFERENCE,1,500)
+                        ELSE substr(tr.NARRATIVE_2 || ' ' || stm.OUR_REFERENCE,1,500)
                     END
                     WHEN stm.SYSTEM_ID = 'FX' THEN CASE
-                        WHEN fx.NOTES IS NOT NULL THEN fx.NOTES
-                        ELSE 'MBNT MUA: ' || fx.AMOUNT_BOUGHT || fx.CURRENCY_BOUGHT || ', BAN: ' || fx.AMOUNT_SOLD || fx.CURRENCY_SOLD
+                        WHEN fx.NOTES IS NOT NULL THEN substr(fx.NOTES,1,500)
+                        ELSE substr('MBNT MUA: ' || fx.AMOUNT_BOUGHT || fx.CURRENCY_BOUGHT || ', BAN: ' || fx.AMOUNT_SOLD || fx.CURRENCY_SOLD,1,500)
                     END
                     WHEN stm.SYSTEM_ID = 'FT' THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '422' THEN stm.NARRATIVE_1 || '# Thu phi - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN stm.NARRATIVE_1 || '# VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')
-                        ELSE nvl(stm.NARRATIVE,' ')
+                        WHEN stm.TRANSACTION_CODE = '422' THEN substr(stm.NARRATIVE_1 || '# Thu phi - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN substr(stm.NARRATIVE_1 || '# VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ft.PAYMENT_DETAILS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
+                        ELSE substr(nvl(stm.NARRATIVE,' '),1,500)
                     END
-                    ELSE nvl(stm.NARRATIVE,' ')
+                    ELSE substr(nvl(stm.NARRATIVE,' '),1,500)
                 END TMEFTH,
                 nvl(TO_CHAR(stm.DATE_TIME,'yyyyMMddHH24miss'),' ') TMRESV07,
                 regexp_replace(nvl(stm.trans_reference,' '),'\\[0-9A-Z]+$') TMTKTN,
