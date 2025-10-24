@@ -21,12 +21,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
         WHERE EXISTS (
             SELECT 1
             FROM V_FMSB_ACC_MAPPED ACC
-            AND CDC.WINDOW_ID = ACC.WINDOW_ID
+            WHERE ACC.RECID = CDC.RECID
+            AND CDC.WINDOW_ID <= ACC.WINDOW_ID
         );
         -- ) FETCH FIRST 5000 ROWS ONLY;
 
         IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-            SYS.DBMS_SESSION.SLEEP(0.2);
+        	SYS.DBMS_SESSION.SLEEP(0.2);
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
@@ -52,8 +53,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                     ARR.CURRENCY        AS CURTYP,
                     ACC.INPUTTER        AS CDMUID,
                     ADL.RENEWAL_DATE    AS RS2DT7,
-                    ARR.START_DATE      AS START_DATE,
-                    ARR.ARR_STATUS      AS ARR_STATUS,
                     ACC.WINDOW_ID       AS WINDOW_ID,
                     ACC.COMMIT_TS       AS COMMIT_TS,
                     ACC.REPLICAT_TS     AS REPLICAT_TS,
@@ -63,9 +62,9 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 INNER JOIN V_FMSB_ARR_CD ARR ON ARR.LINKED_APPL_ID = ACC.RECID
                 LEFT JOIN V_FMSB_ADL_MAPPED ADL ON ADL.RECID = ARR.RECID
                 WHERE ARR.START_DATE >= TO_DATE(V_TODAY,'YYYYMMDD')
-            ), 
-            AIT_MAX AS (
-               SELECT 
+            ),
+            AIT_AGGREGATED AS(
+                SELECT 
                     ID_COMP_1, 
                     MAX(ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AIT_CDTNEW AIT
@@ -73,37 +72,19 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                     SELECT 1 FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AIT.ID_COMP_1)
                 AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
-                GROUP BY ID_COMP_1                 
-            ),
-            AIT_AGGREGATED AS(
-                SELECT
-                    AIT.ID_COMP_1, 
-                    AIT.EFFECTIVE_RATE,
-                    AIT.PERIODIC_PERIOD,
-                FROM V_FMSB_AIT_CDTNEW AIT
-                JOIN AIT_MAX M ON AIT.ID_COMP_1 = M.ID_COMP_1 AND AIT.ID_COMP_3 = M.MAX_ID_COMP_3
-            ),
-            ATA_MIN AS (
-                SELECT 
-                    ATA.ID_COMP_1,
-                    MIN(ATA.ID_COMP_3) AS MIN_ID_COMP_3
-                FROM V_FMSB_ATA_MAPPED ATA
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )
-                GROUP BY ATA.ID_COMP_1
+                GROUP BY ID_COMP_1 
             ),
             ATA_AGGREGATED AS(
                 SELECT 
-                	ATA.ID_COMP_1,
-                    ATA.AMOUNT,
-                    ATA.TERM
+                    ID_COMP_1, 
+                    MIN(ID_COMP_3) AS MIN_ID_COMP_3
                 FROM V_FMSB_ATA_MAPPED ATA
-                JOIN ATA_MIN M ON ATA.ID_COMP_1 = M.ID_COMP_1 AND ATA.ID_COMP_3 = M.MIN_ID_COMP_3
-            ), 
-            CHG_MAX AS (
+                WHERE EXISTS (
+                    SELECT 1 FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1)
+                GROUP BY ID_COMP_1
+            ),
+            CHG_AGGREGATED AS(
                 SELECT 
                     ID_COMP_1, 
                     MAX(ID_COMP_3) AS MAX_ID_COMP_3
@@ -111,15 +92,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1 FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = CHG.ID_COMP_1)
-                GROUP BY ID_COMP_1                
-            ),
-            CHG_AGGREGATED AS(
-                SELECT 
-                	CHG.ID_COMP_1,
-                    CHG.CHANGE_PERIOD,
-                    CHG.CHANGE_DATE
-                FROM V_FMSB_CHG_MAPPED CHG
-                JOIN CHG_MAX M ON CHG.ID_COMP_1 = M.ID_COMP_1 AND CHG.ID_COMP_3 = M.MAX_ID_COMP_3
+                GROUP BY ID_COMP_1
             )
             SELECT
                 27 AS BANKNO,
@@ -164,15 +137,18 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 PRE.MAPPED_TS,
                 'ACC'
             FROM PRECOMPUTED PRE
-            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN ATA_AGGREGATED ATA ON ATA.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN CHG_AGGREGATED CHG ON CHG.ID_COMP_1 = PRE.ARR_RECID;
+            LEFT JOIN AIT_AGGREGATED AIT_AGG ON AIT_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_AIT_CDTNEW AIT ON AIT.ID_COMP_1 = AIT_AGG.ID_COMP_1 AND AIT.ID_COMP_3 = AIT_AGG.MAX_ID_COMP_3
+            LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN CHG_AGGREGATED CHG_AGG ON CHG_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_CHG_MAPPED CHG ON CHG.ID_COMP_1 = CHG_AGG.ID_COMP_1 AND CHG.ID_COMP_3 = CHG_AGG.MAX_ID_COMP_3;
 
             DELETE FROM T24_CDTNEW_ACTIVITY_ACC CDC
             WHERE EXISTS (
                 SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) TMP
-                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+                FROM TABLE(V_WINDOW_ID_LIST) V
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
 
             COMMIT;
@@ -197,12 +173,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
         WHERE EXISTS (
             SELECT 1
             FROM V_FMSB_ARR_CD ARR
-            AND CDC.WINDOW_ID = ARR.WINDOW_ID
+            WHERE ARR.RECID = CDC.RECID
+            AND CDC.WINDOW_ID <= ARR.WINDOW_ID
         );
         -- ) FETCH FIRST 5000 ROWS ONLY;
 
         IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-            SYS.DBMS_SESSION.SLEEP(0.2);
+        	SYS.DBMS_SESSION.SLEEP(0.2);
             SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
@@ -236,20 +213,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 INNER JOIN V_FMSB_ARR_CD ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
                 LEFT JOIN V_FMSB_ADL_MAPPED ADL ON ADL.RECID = ARR.RECID
+                WHERE ARR.START_DATE >= TO_DATE(V_TODAY,'YYYYMMDD')
             ),
-            ARC_AGGREGATED AS(
+            AIT_AGGREGATED AS(
                 SELECT 
-                    ARRANGEMENT
-                FROM V_FMSB_ARC_CDTNEW ARC
-                WHERE EXISTS (
-                    SELECT 1 FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ARC.ARRANGEMENT
-                    AND PRE.START_DATE < TO_DATE(V_TODAY,'YYYYMMDD'))
-                AND ARC.TRADE_DATE < TO_DATE(V_TODAY,'YYYYMMDD') 
-                AND TRUNC(TO_DATE(ARC.DATE_TIME, 'RRMMDDHH24MI')) = TO_DATE(V_TODAY,'YYYYMMDD')
-            ),
-            AIT_MAX AS (
-               SELECT 
                     ID_COMP_1, 
                     MAX(ID_COMP_3) AS MAX_ID_COMP_3
                 FROM V_FMSB_AIT_CDTNEW AIT
@@ -257,37 +224,19 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                     SELECT 1 FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = AIT.ID_COMP_1)
                 AND AIT.ID_COMP_3 <= V_TODAY || '.9999'
-                GROUP BY ID_COMP_1                 
-            ),
-            AIT_AGGREGATED AS(
-                SELECT 
-                    AIT.ID_COMP_1,
-                    AIT.EFFECTIVE_RATE,
-                    AIT.PERIODIC_PERIOD 
-                FROM V_FMSB_AIT_CDTNEW AIT
-                JOIN AIT_MAX M ON AIT.ID_COMP_1 = M.ID_COMP_1 AND AIT.ID_COMP_3 = M.MAX_ID_COMP_3
-            ),
-            ATA_MIN AS (
-                SELECT 
-                    ATA.ID_COMP_1,
-                    MIN(ATA.ID_COMP_3) AS MIN_ID_COMP_3
-                FROM V_FMSB_ATA_MAPPED ATA
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM PRECOMPUTED PRE
-                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                )
-                GROUP BY ATA.ID_COMP_1
+                GROUP BY ID_COMP_1
             ),
             ATA_AGGREGATED AS(
                 SELECT 
-                    ATA.ID_COMP_1,
-                    ATA.AMOUNT,
-                    ATA.TERM
+                    ID_COMP_1, 
+                    MIN(ID_COMP_3) AS MIN_ID_COMP_3
                 FROM V_FMSB_ATA_MAPPED ATA
-                JOIN ATA_MIN M ON ATA.ID_COMP_1 = M.ID_COMP_1 AND ATA.ID_COMP_3 = M.MIN_ID_COMP_3
+                WHERE EXISTS (
+                    SELECT 1 FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1)
+                GROUP BY ID_COMP_1
             ),
-            CHG_MAX AS (
+            CHG_AGGREGATED AS(
                 SELECT 
                     ID_COMP_1, 
                     MAX(ID_COMP_3) AS MAX_ID_COMP_3
@@ -295,15 +244,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 WHERE EXISTS (
                     SELECT 1 FROM PRECOMPUTED PRE
                     WHERE PRE.ARR_RECID = CHG.ID_COMP_1)
-                GROUP BY ID_COMP_1                
-            ),
-            CHG_AGGREGATED AS(
-                SELECT 
-                    CHG.ID_COMP_1,
-                    CHG.CHANGE_PERIOD,
-                    CHG.CHANGE_DATE
-                FROM V_FMSB_CHG_MAPPED CHG
-                JOIN CHG_MAX M ON CHG.ID_COMP_1 = M.ID_COMP_1 AND CHG.ID_COMP_3 = M.MAX_ID_COMP_3
+                GROUP BY ID_COMP_1
             )
             SELECT
                 27 AS BANKNO,
@@ -348,19 +289,18 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 PRE.MAPPED_TS,
                 'ARR'
             FROM PRECOMPUTED PRE
-            LEFT JOIN AIT_AGGREGATED AIT ON AIT.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN ATA_AGGREGATED ATA ON ATA.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN CHG_AGGREGATED CHG ON CHG.ID_COMP_1 = PRE.ARR_RECID
-            LEFT JOIN ARC_AGGREGATED ARC ON ARC.ARRANGEMENT = PRE.ARR_RECID
-            WHERE (PRE.START_DATE >= TO_DATE(V_TODAY,'YYYYMMDD'))
-                OR (PRE.ARR_STATUS = 'AUTH' AND PRE.START_DATE < TO_DATE(V_TODAY,'YYYYMMDD'))
-                OR (ARC.ARRANGEMENT IS NOT NULL);
+            LEFT JOIN AIT_AGGREGATED AIT_AGG ON AIT_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_AIT_CDTNEW AIT ON AIT.ID_COMP_1 = AIT_AGG.ID_COMP_1 AND AIT.ID_COMP_3 = AIT_AGG.MAX_ID_COMP_3
+            LEFT JOIN ATA_AGGREGATED ATA_AGG ON ATA_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_ATA_MAPPED ATA ON ATA.ID_COMP_1 = ATA_AGG.ID_COMP_1 AND ATA.ID_COMP_3 = ATA_AGG.MIN_ID_COMP_3
+            LEFT JOIN CHG_AGGREGATED CHG_AGG ON CHG_AGG.ID_COMP_1 = PRE.ARR_RECID
+            LEFT JOIN V_FMSB_CHG_MAPPED CHG ON CHG.ID_COMP_1 = CHG_AGG.ID_COMP_1 AND CHG.ID_COMP_3 = CHG_AGG.MAX_ID_COMP_3;
 
             DELETE FROM T24_CDTNEW_ACTIVITY_ARR CDC
             WHERE EXISTS (
                 SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) TMP
-                WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+                FROM TABLE(V_WINDOW_ID_LIST) V
+                WHERE V.COLUMN_VALUE = CDC.WINDOW_ID
             );
 
             COMMIT;
