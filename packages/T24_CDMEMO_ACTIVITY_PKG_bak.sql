@@ -167,17 +167,20 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDMEMO_ACTIVITY_PKG IS
         WHERE EXISTS (
             SELECT 1
             FROM V_FMSB_ECB_MAPPED ECB
-            AND ECB.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ECB.RECID = CDC.JOIN_KEY
+            AND ECB.WINDOW_ID >= CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_ACC_MAPPED ACC
-            AND ACC.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ACC.RECID = CDC.JOIN_KEY
+            AND ACC.WINDOW_ID >= CDC.WINDOW_ID
         )
         OR EXISTS (
             SELECT 1
             FROM V_FMSB_ARR_CD ARR
-            AND ARR.WINDOW_ID = CDC.WINDOW_ID
+            WHERE ARR.LINKED_APPL_ID = CDC.JOIN_KEY
+            AND ARR.WINDOW_ID >= CDC.WINDOW_ID
         );
         -- ) FETCH FIRST 9999 ROWS ONLY;
         
