@@ -262,7 +262,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                 nvl(REGEXP_SUBSTR(stm.RECID, '[^.]+', 1, 2),' ') TMSSEQ,
                 CASE
                     WHEN stm.TRANS_REFERENCE LIKE 'CHG%' THEN CASE
-                        WHEN stm.TRANSACTION_CODE = '5021' THEN substr('VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# ')1,500)
+                        WHEN stm.TRANSACTION_CODE = '5021' THEN substr('VAT - ' || REGEXP_REPLACE(regexp_replace(cast(ac.REMARKS as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
                         ELSE substr(REGEXP_REPLACE(regexp_replace(cast(nvl(ac.REMARKS,' ') as varchar2(4000)),'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
                     END
                     WHEN stm.SYSTEM_ID IN ('ACSW', 'ACCP') THEN substr('Chuyen tien tu dong - ' || stm.THEIR_REFERENCE,1,500)
