@@ -59,6 +59,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 
  PROCEDURE GEN_FROM_STM_PROC IS
         V_WINDOW_ID_LIST T_WINDOW_ID_ARRAY;
+        V_DUMMY    NUMBER;
         V_TODAY          VARCHAR2(8);
     BEGIN
 
@@ -109,10 +110,20 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 	)
 	; 
         
-
+    select 
+        case when EXISTS (
+            select 1
+            from TABLE(V_WINDOW_ID_LIST) a 
+            join T24_TMTRAN_STM_TRIGGER b on a.COLUMN_VALUE = b.WINDOW_ID
+            where b.SYSTEM_ID = 'PP'
+        ) then 1 else 0 end
+        into V_DUMMY
+    from dual;
 
     IF V_WINDOW_ID_LIST.COUNT > 0 THEN
-
+        if V_DUMMY = 1 then
+            sys.dbms_session.SLEEP(0.5);
+        END IF;
 
        
         SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
