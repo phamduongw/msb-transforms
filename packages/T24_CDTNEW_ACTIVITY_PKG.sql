@@ -240,7 +240,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                     ARR.ARR_STATUS      AS ARR_STATUS,
                     ACC.OPEN_ACTUAL_BAL AS CBAL,
                     ARR.START_DATE      AS START_DATE,
-                    ACC.OPENING_DATE    AS ISSDT, 
+                    ACC.OPENING_DATE 	AS ISSDT,
                     ADL.MATURITY_DATE   AS MATDT,
                     ARR.CURRENCY        AS CURTYP,
                     ACC.INPUTTER        AS CDMUID,
