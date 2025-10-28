@@ -5,13 +5,13 @@ BEGIN
         job_action       => q'[
             BEGIN
                 DELETE FROM T24_LNMEMO_ACTIVITY_ACC_ARR_ECB
-                WHERE CAPTURED_TIME < (SYSTIMESTAMP - INTERVAL '1' DAY);
+                WHERE CAPTURED_TIME < TRUNC(SYSTIMESTAMP);
                 
                 DELETE FROM T24_LNMEMO_ACTIVITY_BIL
-                WHERE CAPTURED_TIME < (SYSTIMESTAMP - INTERVAL '1' DAY);
+                WHERE CAPTURED_TIME < TRUNC(SYSTIMESTAMP);
 
                 DELETE FROM T24_LNMEMO_ACTIVITY_LMT
-                WHERE CAPTURED_TIME < (SYSTIMESTAMP - INTERVAL '1' DAY);
+                WHERE CAPTURED_TIME < TRUNC(SYSTIMESTAMP);
 
                 COMMIT;
             END;
