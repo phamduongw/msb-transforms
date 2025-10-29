@@ -38,23 +38,23 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
             )
             WITH PRECOMPUTED AS (
                 SELECT /*+ MATERIALIZE */
-                    ACC.RECID           AS ACC_RECID,
-                    ARR.RECID           AS ARR_RECID,
-                    ACC.ACNAME          AS ACNAME,
-                    ACC.CUSTOMER        AS CIFNO,
-                    ARR.ACTIVE_PRODUCT  AS TYPE,
-                    ACC.CO_CODE         AS BRN,
-                    ARR.ARR_STATUS      AS STATUS,
-                    ACC.OPEN_ACTUAL_BAL AS CBAL,
-                    ACC.OPENING_DATE    AS ISSDT, 
-                    ADL.MATURITY_DATE   AS MATDT,
-                    ARR.CURRENCY        AS CURTYP,
-                    ACC.INPUTTER        AS CDMUID,
-                    ADL.RENEWAL_DATE    AS RS2DT7,
-                    ACC.WINDOW_ID       AS WINDOW_ID,
-                    ACC.COMMIT_TS       AS COMMIT_TS,
-                    ACC.REPLICAT_TS     AS REPLICAT_TS,
-                    ACC.MAPPED_TS       AS MAPPED_TS
+                    ACC.RECID             AS ACC_RECID,
+                    ARR.RECID             AS ARR_RECID,
+                    ACC.ACNAME            AS ACNAME,
+                    ACC.CUSTOMER          AS CIFNO,
+                    ARR.ACTIVE_PRODUCT    AS TYPE,
+                    ACC.CO_CODE           AS BRN,
+                    ARR.ARR_STATUS        AS STATUS,
+                    ACC.ONLINE_ACTUAL_BAL AS CBAL,
+                    ACC.OPENING_DATE      AS ISSDT, 
+                    ADL.MATURITY_DATE     AS MATDT,
+                    ARR.CURRENCY          AS CURTYP,
+                    ACC.INPUTTER          AS CDMUID,
+                    ADL.RENEWAL_DATE      AS RS2DT7,
+                    ACC.WINDOW_ID         AS WINDOW_ID,
+                    ACC.COMMIT_TS         AS COMMIT_TS,
+                    ACC.REPLICAT_TS       AS REPLICAT_TS,
+                    ACC.MAPPED_TS         AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.WINDOW_ID = V.COLUMN_VALUE
                 INNER JOIN V_FMSB_ARR_CD ARR ON ARR.LINKED_APPL_ID = ACC.RECID
@@ -231,24 +231,24 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
             ),
             PRECOMPUTED AS (
                 SELECT /*+ MATERIALIZE */
-                    ARR.LINKED_APPL_ID  AS ARR_LINKED_APPL_ID,
-                    ARR.RECID           AS ARR_RECID,
-                    ACC.ACNAME          AS ACNAME,
-                    ACC.CUSTOMER        AS CIFNO,
-                    ARR.ACTIVE_PRODUCT  AS TYPE,
-                    ACC.CO_CODE         AS BRN,
-                    ARR.ARR_STATUS      AS ARR_STATUS,
-                    ACC.OPEN_ACTUAL_BAL AS CBAL,
-                    ARR.START_DATE      AS START_DATE,
-                    ACC.OPENING_DATE 	AS ISSDT,
-                    ADL.MATURITY_DATE   AS MATDT,
-                    ARR.CURRENCY        AS CURTYP,
-                    ACC.INPUTTER        AS CDMUID,
-                    ADL.RENEWAL_DATE    AS RS2DT7,
-                    ARR.WINDOW_ID       AS WINDOW_ID,
-                    ARR.COMMIT_TS       AS COMMIT_TS,
-                    ARR.REPLICAT_TS     AS REPLICAT_TS,
-                    ARR.MAPPED_TS       AS MAPPED_TS
+                    ARR.LINKED_APPL_ID    AS ARR_LINKED_APPL_ID,
+                    ARR.RECID             AS ARR_RECID,
+                    ACC.ACNAME            AS ACNAME,
+                    ACC.CUSTOMER          AS CIFNO,
+                    ARR.ACTIVE_PRODUCT    AS TYPE,
+                    ACC.CO_CODE           AS BRN,
+                    ARR.ARR_STATUS        AS ARR_STATUS,
+                    ACC.ONLINE_ACTUAL_BAL AS CBAL,
+                    ARR.START_DATE        AS START_DATE,
+                    ACC.OPENING_DATE 	  AS ISSDT,
+                    ADL.MATURITY_DATE     AS MATDT,
+                    ARR.CURRENCY          AS CURTYP,
+                    ACC.INPUTTER          AS CDMUID,
+                    ADL.RENEWAL_DATE      AS RS2DT7,
+                    ARR.WINDOW_ID         AS WINDOW_ID,
+                    ARR.COMMIT_TS         AS COMMIT_TS,
+                    ARR.REPLICAT_TS       AS REPLICAT_TS,
+                    ARR.MAPPED_TS         AS MAPPED_TS
                 FROM GROUPED GRP
                 INNER JOIN  V_FMSB_ARR_CD ARR     ON ARR.RECID = GRP.COLUMN_VALUE
                 INNER JOIN  V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
