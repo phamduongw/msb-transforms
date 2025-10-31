@@ -126,10 +126,10 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_DDTNEW_ACTIVITY_PKG IS
                     ACC.OPENING_DATE        AS OPENING_DATE,
                     ARR.START_DATE          AS START_DATE,
                     ACC.ONLINE_ACTUAL_BAL   AS CBAL,
-                    ARR.WINDOW_ID,
-                    ARR.COMMIT_TS,
-                    ARR.REPLICAT_TS,
-                    ARR.MAPPED_TS
+                    ARR.WINDOW_ID           AS WINDOW_ID,
+                    ARR.COMMIT_TS           AS COMMIT_TS,
+                    ARR.REPLICAT_TS         AS REPLICAT_TS,
+                    ARR.MAPPED_TS           AS MAPPED_TS
                 FROM TABLE(V_WINDOW_ID_LIST) V
                 INNER JOIN V_FMSB_ARR_MAPPED ARR ON ARR.WINDOW_ID = V.COLUMN_VALUE
                 INNER JOIN V_FMSB_ACC_MAPPED ACC ON ACC.RECID = ARR.LINKED_APPL_ID
