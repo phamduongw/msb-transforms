@@ -125,7 +125,13 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
             sys.dbms_session.SLEEP(0.5);
         END IF;
 
-       
+        DELETE FROM T24_TMTRAN_STM_TRIGGER CDC
+        WHERE EXISTS (
+                SELECT 1
+                FROM TABLE(V_WINDOW_ID_LIST) TMP
+            WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
+        );
+        
         SELECT /*+ RESULT_CACHE */ TODAY INTO V_TODAY
             FROM F_DAT_MAPPED
             WHERE RECID = 'VN0011000';
@@ -282,7 +288,7 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
                         ELSE substr(tr.NARRATIVE_2 || ' ' || stm.OUR_REFERENCE,1,500)
                     END
                     WHEN stm.SYSTEM_ID = 'FX' THEN CASE
-                        WHEN fx.NOTES IS NOT NULL THEN substr(fx.NOTES,1,500)
+                        WHEN fx.NOTES IS NOT NULL THEN substr(REGEXP_REPLACE(regexp_replace(fx.NOTES,'(^#1:|#$)',''),'(#[0-9]+:)','# '),1,500)
                         ELSE substr('MBNT MUA: ' || fx.AMOUNT_BOUGHT || fx.CURRENCY_BOUGHT || ', BAN: ' || fx.AMOUNT_SOLD || fx.CURRENCY_SOLD,1,500)
                     END
                     WHEN stm.SYSTEM_ID = 'FT' THEN CASE
@@ -308,13 +314,6 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
             left join acc_arr acc on stm.ACCOUNT_NUMBER = acc.recid
             left join T24RAWOGG.fmsb_fx_mapped fx on stm.our_reference = fx.recid
             left join T24RAWOGG.fmsb_tr_mapped tr on stm.transaction_code = tr.recid;
-
-        DELETE FROM T24_TMTRAN_STM_TRIGGER CDC
-        WHERE EXISTS (
-                SELECT 1
-                FROM TABLE(V_WINDOW_ID_LIST) TMP
-            WHERE TMP.COLUMN_VALUE = CDC.WINDOW_ID
-        );
 
         COMMIT;
     end if;
