@@ -1,13 +1,13 @@
--- ACC_ARR_ECB
+-- ACC_ARR_ECB_LMT
 BEGIN
     DBMS_SCHEDULER.create_job(
-        job_name   => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_ARR_ECB_JOB',
+        job_name   => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_ARR_ECB_LMT_JOB',
         job_type   => 'PLSQL_BLOCK',
         job_action => q'[
             BEGIN
                 EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
                 LOOP
-                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ACC_ARR_ECB_PROC;
+                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_ACC_ARR_ECB_LMT_PROC;
                 END LOOP;
             END;
         ]',
@@ -17,7 +17,7 @@ BEGIN
     );
 
     DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_ARR_ECB_JOB',
+        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_ACC_ARR_ECB_LMT_JOB',
         attribute => 'instance_id',
         value     => 1
     );
@@ -43,31 +43,6 @@ BEGIN
 
     DBMS_SCHEDULER.set_attribute(
         name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_BIL_JOB',
-        attribute => 'instance_id',
-        value     => 1
-    );
-END;
-
--- LMT
-BEGIN
-    DBMS_SCHEDULER.create_job(
-        job_name   => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_LMT_JOB',
-        job_type   => 'PLSQL_BLOCK',
-        job_action => q'[
-            BEGIN
-                EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_NUMERIC_CHARACTERS = ''.,''';
-                LOOP
-                    T24RAWOGG.T24_LNMEMO_ACTIVITY_PKG.GEN_FROM_LMT_PROC;
-                END LOOP;
-            END;
-        ]',
-        start_date => SYSTIMESTAMP,
-        enabled    => FALSE,
-        auto_drop  => FALSE
-    );
-
-    DBMS_SCHEDULER.set_attribute(
-        name      => 'T24RAWOGG.T24_LNMEMO_ACTIVITY_GEN_FROM_LMT_JOB',
         attribute => 'instance_id',
         value     => 1
     );
