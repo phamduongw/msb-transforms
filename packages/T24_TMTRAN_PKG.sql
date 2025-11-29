@@ -71,33 +71,17 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 	WINDOW_ID
 	from T24_TMTRAN_STM_TRIGGER cdc
 	where SYSTEM_ID not in ('FT','AC','PP','AA') 
-	  union all
-	  select
-	WINDOW_ID
-	from T24_TMTRAN_STM_TRIGGER cdc
-	where EXISTS (
+	OR EXISTS (
 	    select 1
 	    from fmsb_ft_mapped ft 
 	where  cdc.JOIN_KEY = ft.RECID)
-	union all
-	select
-	WINDOW_ID
-	from T24_TMTRAN_STM_TRIGGER cdc
-	where EXISTS (
+	OR EXISTS (
 	    select 1
 	    from fmsb_ac_mapped ac WHERE cdc.JOIN_KEY = ac.recid)
-	union all
-	select
-	WINDOW_ID
-	from T24_TMTRAN_STM_TRIGGER cdc
-	where EXISTS (
+	OR EXISTS (
 	    select 1
 	    from fmsb_arr_mapped arr WHERE cdc.JOIN_KEY = arr.LINKED_APPL_ID)
-	UNION all
-	select
-	WINDOW_ID
-	from T24_TMTRAN_STM_TRIGGER cdc
-	where EXISTS (
+	OR EXISTS (
 	    select 1
 	    from T24_TMTRAN_STM_TRIGGER tpor
 	    join F_POR_MAPPED por on tpor.JOIN_KEY = por.recid   
@@ -326,3 +310,4 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_TMTRAN_PKG IS
 
     
 END T24_TMTRAN_PKG;
+
