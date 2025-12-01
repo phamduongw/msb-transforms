@@ -297,30 +297,29 @@ CREATE OR REPLACE PACKAGE BODY T24RAWOGG.T24_CDTNEW_ACTIVITY_PKG IS
                 FROM V_FMSB_AIT_CDTNEW AIT
                 JOIN AIT_MAX M ON AIT.ID_COMP_1 = M.ID_COMP_1 AND AIT.ID_COMP_3 = M.MAX_ID_COMP_3
             ),
-            ATA_PRECOMPUTED AS (
-                SELECT *
-                FROM (
-                    SELECT
-                        ATA.*,
-                        ROW_NUMBER() OVER (PARTITION BY ATA.ID_COMP_1 ORDER BY ATA.ID_COMP_3 ASC) AS RN_MIN,
-                        ROW_NUMBER() OVER (PARTITION BY ATA.ID_COMP_1 ORDER BY ATA.ID_COMP_3 DESC) AS RN_MAX
-                    FROM V_FMSB_ATA_MAPPED ATA
-                    WHERE EXISTS (
-                        SELECT 1 FROM PRECOMPUTED PRE WHERE PRE.ARR_RECID = ATA.ID_COMP_1
-                    )
+            ATA_MIN AS (
+                SELECT 
+                    ATA.ID_COMP_1,
+                    MIN(ATA.ID_COMP_3) AS MIN_ID_COMP_3
+                FROM V_FMSB_ATA_MAPPED ATA
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM PRECOMPUTED PRE
+                    WHERE PRE.ARR_RECID = ATA.ID_COMP_1
                 )
+                GROUP BY ATA.ID_COMP_1
             ),
             ATA_AGGREGATED AS(
-                SELECT
-                    ID_COMP_1,
-                    MAX(CASE WHEN RN_MIN = 1 THEN AMOUNT END)      AS AMOUNT,
-                    MAX(CASE WHEN RN_MIN = 1 THEN TERM END)        AS TERM,
-                    MAX(CASE WHEN RN_MAX = 1 THEN WINDOW_ID END)   AS WINDOW_ID,
-                    MAX(CASE WHEN RN_MAX = 1 THEN COMMIT_TS END)   AS COMMIT_TS,
-                    MAX(CASE WHEN RN_MAX = 1 THEN REPLICAT_TS END) AS REPLICAT_TS,
-                    MAX(CASE WHEN RN_MAX = 1 THEN MAPPED_TS END)   AS MAPPED_TS
-                FROM ATA_PRECOMPUTED
-                GROUP BY ID_COMP_1
+                SELECT 
+                    ATA.ID_COMP_1,
+                    ATA.AMOUNT,
+                    ATA.TERM,
+                    ATA.WINDOW_ID,
+                    ATA.COMMIT_TS,
+                    ATA.REPLICAT_TS,
+                    ATA.MAPPED_TS
+                FROM V_FMSB_ATA_MAPPED ATA
+                JOIN ATA_MIN M ON ATA.ID_COMP_1 = M.ID_COMP_1 AND ATA.ID_COMP_3 = M.MIN_ID_COMP_3
             ),
             CHG_MAX AS (
                 SELECT 
